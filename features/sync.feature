@@ -5,10 +5,10 @@ Feature: Sync
 
 	Scenario: Initialize folder
 		Given I have a folder with files
-		| name				| 	size (GB) | 
-		| backup-2014-03-03	|	1.4		  |
-		| backup-2014-03-04	|	1.7		  |
-		| backup-2014-03-04	|	2.2		  |
+		| name				| 	size 		| 
+		| backup-2014-03-03	|	1400000000	|
+		| backup-2014-03-04	|	1700000000	|
+		| backup-2014-03-05	|	2200000000	|
 		When I execute "cuckoodrive init"
 		Then the folder is indexed 
 		And a json index file is created
@@ -33,25 +33,25 @@ Feature: Sync
 
 	Scenario: Synchronize folder initially
 		Given I have a folder with files
-		| name				| 	size (GB) | 
-		| backup-2014-03-03	|	1.4		  |
-		| backup-2014-03-04	|	1.7		  |
-		| backup-2014-03-04	|	2.2		  |
+		| name				| 	size 		| 
+		| backup-2014-03-03	|	1400000000	|
+		| backup-2014-03-04	|	1700000000	|
+		| backup-2014-03-05	|	2200000000	|
 		When I synchronize initially
 		Then the files in the folder are synchronized with all the cloud storage providers
 
 	Scenario: Synchronize folder after something was removed
 		Given I have provider "googledrive" with files
-		| name				| 	size (GB) | 
-		| backup-2014-03-03	|	1.4		  |
-		| backup-2014-03-04	|	2.2		  |
+		| name				| 	size 		| 
+		| backup-2014-03-03	|	1400000000	|
+		| backup-2014-03-05	|	2200000000	|
 		And I have provider "dropbox" with files
-		| name				| 	size (GB) | 
-		| backup-2014-03-03	|	1.4		  |
-		| backup-2014-03-04	|	1.7		  |
+		| name				| 	size 		| 
+		| backup-2014-03-03	|	1400000000	|
+		| backup-2014-03-04	|	1700000000	|
 		When I synchronize an empty folder with the files
 		Then the missing files in the folder are pulled from the cloud storage providers and added again so that I have files
-		| name				| 	size (GB) | 
-		| backup-2014-03-03	|	1.4		  |
-		| backup-2014-03-04	|	1.7		  |
-		| backup-2014-03-04	|	2.2		  |
+		| name				| 	size 		| 
+		| backup-2014-03-03	|	1400000000	|
+		| backup-2014-03-04	|	1700000000	|
+		| backup-2014-03-05	|	2200000000	|
