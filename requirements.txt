@@ -1,6 +1,8 @@
-behave==1.2.4
-enum34==0.9.23
+pytest==2.5.2
+dropbox==2.0.0
+google-api-python-client==1.2
+box.py==1.2.8
+python-skydrive==13.12.1
+mega.py==0.9.18
+amazon-cloud-drive==0.1.2
 fs==0.4.1
-parse==1.6.3
-parse-type==0.3.4
-six==1.5.2
