@@ -5,13 +5,13 @@ Feature: Sync
 
 	Scenario: Initialize folder
 		Given I have a folder with files
-		| name				| 	size 		| 
-		| backup-2014-03-03	|	1400000000	|
-		| backup-2014-03-04	|	1700000000	|
-		| backup-2014-03-05	|	2200000000	|
-		When I execute "cuckoodrive init"
+		| name				| 	size 	| 
+		| backup-2014-03-03	|	1400000	|
+		| backup-2014-03-04	|	1700000	|
+		| backup-2014-03-05	|	2200000 |
+		When I initialize the folder	
 		Then the folder is indexed 
-		And a json index file is created
+		And a valid json index file is created
 		And the index file contains all the files in the folder
 
 
@@ -34,24 +34,26 @@ Feature: Sync
 	Scenario: Synchronize folder initially
 		Given I have a folder with files
 		| name				| 	size 		| 
-		| backup-2014-03-03	|	1400000000	|
-		| backup-2014-03-04	|	1700000000	|
-		| backup-2014-03-05	|	2200000000	|
+		| backup-2014-03-03	|	1400000	|
+		| backup-2014-03-04	|	1700000	|
+		| backup-2014-03-05	|	2200000	|
+		And provider "dropbox" has 10000000 free space
+		And provider "googledrive" has 10000000 free space
 		When I synchronize initially
 		Then the files in the folder are synchronized with all the cloud storage providers
 
 	Scenario: Synchronize folder after something was removed
 		Given I have provider "googledrive" with files
 		| name				| 	size 		| 
-		| backup-2014-03-03	|	1400000000	|
-		| backup-2014-03-05	|	2200000000	|
+		| backup-2014-03-03	|	1400000	|
+		| backup-2014-03-05	|	2200000	|
 		And I have provider "dropbox" with files
 		| name				| 	size 		| 
-		| backup-2014-03-03	|	1400000000	|
-		| backup-2014-03-04	|	1700000000	|
+		| backup-2014-03-03	|	1400000	|
+		| backup-2014-03-04	|	1700000	|
 		When I synchronize an empty folder with the files
 		Then the missing files in the folder are pulled from the cloud storage providers and added again so that I have files
 		| name				| 	size 		| 
-		| backup-2014-03-03	|	1400000000	|
-		| backup-2014-03-04	|	1700000000	|
-		| backup-2014-03-05	|	2200000000	|
+		| backup-2014-03-03	|	1400000	|
+		| backup-2014-03-04	|	1700000	|
+		| backup-2014-03-05	|	2200000	|
