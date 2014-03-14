@@ -2,7 +2,7 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 
 from os.path import basename, normpath
-
+from StringIO import StringIO
 from fs.base import FS, synchronize
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 from fs.errors import DestinationExistsError
@@ -11,7 +11,30 @@ from dropbox import rest
 
 class DropboxFile:
     """A file like interface for the DropboxFS"""
-    pass
+    def __init__(self, fs, path, mode):
+        self.fs = fs
+        self.path = path
+        self.mode = mode
+        self.closed = False
+        self.file_size = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def read(self):
+        file, metadata = self.fs.client.get_file_and_metadata(self.path)
+        return file.read()
+
+    def write(self, data):
+        file = StringIO(data)
+        self.fs.client.put_file(self.path, file)
+        return True
+
+    def close(self):
+        self.closed = True
 
 
 class DropboxFS(FS):
@@ -55,7 +78,12 @@ class DropboxFS(FS):
     @synchronize
     def open(self, path, mode="rb", **kwargs):
         path = normpath(path).lstrip('/')
-        file = self.client.get_file(path)
+        if "r" in mode:
+            if not self.exists(path):
+                raise ResourceNotFoundError(path)
+            if self.isdir(path):
+                raise ResourceInvalidError(path)
+        file = DropboxFile(self, path, mode)
         return file
 
     def isfile(self, path):
