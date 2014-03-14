@@ -1,5 +1,5 @@
-mkdir lib
-cd lib
+mkdir .tmp
+cd .tmp
 
 # Install fs (pyfilesystem)
 echo "Checking out pyfilesystem with svn to install it"
