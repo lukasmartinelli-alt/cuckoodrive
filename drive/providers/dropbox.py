@@ -3,9 +3,11 @@ from __future__ import print_function, division, absolute_import, unicode_litera
 
 from os.path import basename, normpath
 from StringIO import StringIO
+
 from fs.base import FS, synchronize
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 from fs.errors import DestinationExistsError
+
 from dropbox import rest
 
 

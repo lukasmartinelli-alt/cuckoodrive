@@ -32,9 +32,6 @@ class GoogleDriveFS(FS):
     def __unicode__(self):
         return u"<GoogleDriveFS: %s>" % self.root_path
 
-    def _get_root(self):
-        self.client.parents().get()
-
     # --------------------------------------------------------------------
     # Essential Methods as defined in
     # https://pythonhosted.org/fs/implementersguide.html#essential-methods
