@@ -17,7 +17,7 @@ class TestDropboxFs:
         """Create a DropboxFS with a real Dropbox client that connects to a
         test directory. The fixture deletes all the created
         folders and folders in the finalizer"""
-        client = DropboxClient('fIeCAUcoJUcAAAAAAAAAAYgZtfWLP7e1U8c8rbkEOCkrXXUU9WshRiufV8TY-dfy')
+        client = DropboxClient('q3UFckbQggcAAAAAAAAAAdj9VvMFNx18Et2_BZLZxxLxCg6BLu3fLa15m8-qBvpB')
         fs = DropboxFS(client)
 
         def cleanup_dropbox():
