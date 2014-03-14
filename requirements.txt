@@ -1,8 +1,12 @@
-pytest==2.5.2
+pytest
+coverage
+coveralls
+
+fs==0.4.1
+
 dropbox==2.0.0
 google-api-python-client==1.2
 box.py==1.2.8
 python-skydrive==13.12.1
 mega.py==0.9.18
 amazon-cloud-drive==0.1.2
-fs==0.4.1
