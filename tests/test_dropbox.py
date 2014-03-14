@@ -1,15 +1,21 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
-from pytest import fixture
+from os import urandom
+from pytest import fixture, raises
 
 
 from dropbox.client import DropboxClient
+from fs.errors import ResourceNotFoundError
+
 from drive.providers.dropbox import DropboxFS
 
 
 class TestDropboxFs:
+    """Integration test of the DropboxFS using a real dropbox folder"""
     @fixture
     def dropbox(self, request):
+        """Create a real dropbox client that connects to a test directory. The fixture
+        deletes all the created folders in the finalizer"""
         client = DropboxClient('fIeCAUcoJUcAAAAAAAAAAYgZtfWLP7e1U8c8rbkEOCkrXXUU9WshRiufV8TY-dfy')
         fs = DropboxFS(client)
 
@@ -19,6 +25,45 @@ class TestDropboxFs:
 
         request.addfinalizer(cleanup_dropbox)
         return fs
+
+    def test_open_file_that_doesnt_exist(self, dropbox):
+        #Arrange
+        path = "get_me_if_you_can"
+        #Act & Assert
+        with raises(ResourceNotFoundError):
+            dropbox.open(path)
+
+    def test_open_existing_file_and_read_from_it(self, dropbox):
+        #Arrange
+        path = "new_file"
+        text = "Lorem ipsum"
+        with dropbox.open(path, "w") as file:
+            file.write(text)
+        #Act
+        written_text = ""
+        with dropbox.open(path, "r") as file:
+            written_text = file.read()
+        #Assert
+        assert text == written_text
+
+    def test_open_new_file_as_binary_and_write_to_it(self, dropbox):
+        #Arrange
+        path = "new_binary_file"
+        #Act
+        file = dropbox.open(path, "wb")
+        file.write(urandom(1024))
+        file.close()
+        #Assert
+        assert dropbox.exists(path)
+
+    def test_open_new_file_as_text_and_write_to_it(self, dropbox):
+        #Arrange
+        path = "new_text_file"
+        #Act
+        with dropbox.open(path, "w") as file:
+            file.write(str(urandom(1024)))
+        #Assert
+        assert dropbox.exists(path)
 
     def test_listdir_lists_all_existing_directories(self, dropbox):
         #Arrange
@@ -64,6 +109,13 @@ class TestDropboxFs:
         #Assert
         assert not dropbox.exists(path)
 
+    def test_removedir_raises_resourcenotfound_exception_when_dir_doesnt_exist(self, dropbox):
+        #Arrange
+        path = "remove_me_if_you_can"
+        #Act & Assert
+        with raises(ResourceNotFoundError):
+            dropbox.removedir(path)
+
     def test_exists_returns_false_if_file_was_deleted(self, dropbox):
         #Arrange
         path = "i_shouldnt_exist_afterwards"
@@ -73,6 +125,13 @@ class TestDropboxFs:
         exists = dropbox.exists(path)
         #Assert
         assert not exists
+
+    def test_getinfo_raises_resourcenotfound_exception_when_path_doesnt_exist(self, dropbox):
+        #Arrange
+        path = "i_dont_exist"
+        #Act & Assert
+        with raises(ResourceNotFoundError):
+            dropbox.getinfo(path)
 
     def test_desc_returns_storage_name_and_path(self, dropbox):
         #Arrange

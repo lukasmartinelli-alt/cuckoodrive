@@ -9,6 +9,11 @@ from fs.errors import DestinationExistsError
 from dropbox import rest
 
 
+class DropboxFile:
+    """A file like interface for the DropboxFS"""
+    pass
+
+
 class DropboxFS(FS):
     """
     Uses the Dropbox Python SDK to read and write via HTTP.
