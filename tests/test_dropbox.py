@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 from os import urandom
-from pytest import fixture, raises, mark
+from pytest import fixture, raises
 
 
 from dropbox.client import DropboxClient

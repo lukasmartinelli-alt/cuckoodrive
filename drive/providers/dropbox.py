@@ -10,7 +10,10 @@ from dropbox import rest
 
 
 class DropboxFile:
-    """A file like interface for the DropboxFS"""
+    """A file like interface for the DropboxFS. This does not store any data
+    locally. If you write to this file you're actually writing to a StringIO
+    instance that is then uploaded to dropbox and if your reading, we just
+    download the whole file"""
     def __init__(self, fs, path, mode):
         self.fs = fs
         self.path = path
