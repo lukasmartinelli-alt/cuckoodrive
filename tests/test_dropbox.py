@@ -5,7 +5,7 @@ from pytest import fixture, raises
 
 
 from dropbox.client import DropboxClient
-from fs.errors import ResourceNotFoundError, ResourceInvalidError
+from fs.errors import ResourceNotFoundError, ResourceInvalidError, DestinationExistsError
 
 from drive.providers.dropbox import DropboxFS
 
@@ -111,6 +111,13 @@ class TestDropboxFs:
         #Assert
         assert listing == dir_paths + file_paths
 
+    def test_listdir_raises_error_when_dir_does_not_exist(self, fs):
+        #Arrange
+        path = "/i_do_not_exist_so_you_cant_list_me"
+        #Act & Assert
+        with raises(ResourceNotFoundError):
+            fs.listdir(path)
+
     def test_isdir_returns_true_if_it_is_an_existing_directory(self, fs):
         #Arrange
         path = "i_am_a_directory"
@@ -136,6 +143,14 @@ class TestDropboxFs:
         #Assert
         assert fs.exists(path)
 
+    def test_makedir_raises_error_when_dir_already_exists(self, fs):
+        #Arrange
+        path = "existing_dir"
+        fs.makedir(path)
+        #Act & Assert
+        with raises(DestinationExistsError):
+            fs.makedir(path)
+
     def test_removedir_deletes_directory(self, fs):
         #Arrange
         path = "deletme"
@@ -144,6 +159,15 @@ class TestDropboxFs:
         fs.removedir(path)
         #Assert
         assert not fs.exists(path)
+
+    def test_removedir_raises_error_for_file(self, fs):
+        #Arrange
+        path = "im_a_file_and_not_a_dir.txt"
+        with fs.open(path, 'w') as file:
+            file.write(str(urandom(1024)))
+        #Act & Assert
+        with raises(ResourceInvalidError):
+            fs.removedir(path)
 
     def test_removedir_raises_resourcenotfound_exception_when_dir_doesnt_exist(self, fs):
         #Arrange
