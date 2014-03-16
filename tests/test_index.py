@@ -5,7 +5,7 @@ from os import urandom
 from pytest import fixture
 
 from fs.memoryfs import MemoryFS
-from drive.index import create_index
+from drive.index import Index
 
 
 @fixture
@@ -37,7 +37,7 @@ def test_fs():
 
 def test_create_index_returns_pathmap_with_files(test_fs):
     #Act
-    index = create_index(test_fs)
+    index = Index(test_fs)
     #Assert
     assert 8 == len(list(index.iterkeys()))
 
@@ -46,7 +46,7 @@ def test_create_index_returns_pathmap_with_stored_fileinfo(test_fs):
     #Arrange
     filesize = 4 * 1024
     #Act
-    index = create_index(test_fs)
+    index = Index(test_fs)
     #Assert
     info = index["Photos/My Birthday Party/dancing_around.jpg"]
     assert filesize == info['size']

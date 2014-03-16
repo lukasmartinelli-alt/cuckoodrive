@@ -4,21 +4,21 @@ from __future__ import print_function, division, absolute_import, unicode_litera
 from fs.path import PathMap, pathjoin
 
 
-def create_index(fs):
-    """Creates an index for the files of a filesystem with the help of PathMap
-    The value behind a path is the file information that is provided by the
-    filesystem.
-    """
-    map = PathMap()
+class Index(PathMap):
+    def __init__(self, fs):
+        """Creates an index for the files of a filesystem with the help of PathMap
+        The value behind a path is the file information that is provided by the
+        filesystem.
+        """
+        PathMap.__init__(self)
+        self.fs = fs
+        self._build()
 
-    def build(path="/"):
+    def _build(self, path="/"):
         """Recursively go through the filesystem and add files to the PathMap"""
-        for item in fs.listdir(path):
+        for item in self.fs.listdir(path):
             absolute_path = pathjoin(path, item)
-            if(fs.isdir(absolute_path)):
-                build(absolute_path)
+            if(self.fs.isdir(absolute_path)):
+                self._build(absolute_path)
             else:
-                map[absolute_path] = fs.getinfo(absolute_path)
-
-    build()
-    return map
+                self[absolute_path] = self.fs.getinfo(absolute_path)
