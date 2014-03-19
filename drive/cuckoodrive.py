@@ -5,39 +5,39 @@ class CuckooDriveFS:
     pass
 
 
-class StorageProvider:
-    """A storage provider is a remote filesystem where you can write to"""
+class Storage:
+    """A Storage encapsulates a remote filesystem"""
 
-    def __init__(self, name, fs):
+    def __init__(self, name, fs, max_filesize=50 * 1024 * 1024):
         """
-        Create a new storage provider with an underlying remote filesystem
-        :param fs: Underlying filesystem of the StorageProvider
-        :param name: Name of the StorageProvider
+        Create a new storage with an underlying remote filesystem
+        :param max_filesize: Max allowed upload file size
+        :param fs: Underlying filesystem of the Storage
+        :param name: Name of the Storage
         """
+        self.max_filesize = max_filesize
         self.fs = fs
         self.name = name
         self.allocated_space = 0
 
+    @property
     def free_space(self):
+        """Calculate the space left of a storage. Already allocated space is also taken into account."""
         return self.fs.max_size - self.fs.cur_size - self.allocated_space
+
+    def biggest_file(self):
+        """Calculate the biggest possible file that is possible at the moment. The cap for the biggest
+        file is not only the max_filesize but also the free_space"""
+        if self.free_space <= 0:
+            raise StorageSizeError("There is not enough space left for a file.")
+
+        return self.free_space if self.max_filesize > self.free_space else self.max_filesize
 
 
 class StorageSizeError(Exception):
-    """Exception that is raised if a storage provider has no more space left, even though
+    """Exception that is raised if a storage  or several storages have no more space left, even though
     more space is required"""
-
-    def __init__(self, message, storage_name, free_space, required_space):
-        """
-        Create new error
-        :param message: Why the error was raised
-        :param storage_name: Provider where the error occured
-        :param free_space: Free space of the provier
-        :param required_space: Space that would have been required to fulfill the requirement
-        """
-        Exception.__init__(self, message)
-        self.required_space = required_space
-        self.free_space = free_space
-        self.provider = storage_name
+    pass
 
 
 class StorageAllocation:
@@ -58,43 +58,53 @@ class StorageAllocation:
                 and self.byte_range == other.byte_range
                 and self.storage == other.storage)
 
+    def __repr__(self):
+        return "<StorageAllocation: ({0},{1})@{2}>".format(self.byte_range[0], self.byte_range[1], self.storage.name)
+
+    @property
+    def size(self):
+        return self.byte_range[1] - self.byte_range[0]
 
 class StorageAllocator:
     """The StorageAllocator allocates space for files on different storages.
     He tells all parties that want to write a file with a given size, where to write what
     and ensures criterias like capacity and maximal file upload size are met"""
 
-    def __init__(self, providers):
-        self.providers = providers
+    def __init__(self, storages):
+        self.storages = storages
 
     def best_storage(self):
-        return max(self.providers, key=lambda p: p.free_space())
+        return max(self.storages, key=lambda p: p.free_space)
 
-    def allocate_many(self, filesize):
-        max_filesize = 100 * 1024 * 1024
+    def allocate_many(self, space):
+        """Allocate space for a file among many storages."""
+        not_allocated_space = space
         start = 0
-        end = filesize
+        end = 0
 
-        while end <= filesize:
+        while not_allocated_space > 0:
             storage = self.best_storage()
-            storage.allocated_space += end - start
-            yield StorageAllocation((start, end), storage)
+            allocatable_space = storage.biggest_file()
+
+            storage.allocated_space += allocatable_space
+            not_allocated_space -= allocatable_space
+
             start = end
-            end += max_filesize
+            end = space - not_allocated_space
 
-    def allocate(self, filesize):
-        """Ask the StorageAllocator where to write a file with the given filesize aka allocate space
-        :param filesize: Size of the file that you want to allocate for writing
+            yield StorageAllocation(byte_range=(start, end), storage=storage)
+
+    def allocate(self, space):
+        """Ask the StorageAllocator where to write a file with the given space aka allocate space
+        :param space: Size of the file that you want to allocate for writing
         """
-        available_space = sum([p.free_space() for p in self.providers])
-        if filesize > available_space:
-            raise StorageSizeError(message="File is to big to split up and allocate on differents storages",
-                                   storage_name=",".join(self.providers),
-                                   free_space=available_space, required_space=filesize)
-
+        total_free_space = sum([p.free_space for p in self.storages])
+        if space > total_free_space:
+            raise StorageSizeError(message="File with size " + space + "  is too big to store on CuckooDrive."
+                                           + "Total free space available is " + total_free_space)
         best_storage = self.best_storage()
-        if filesize > best_storage:
-            best_storage.allocated_space += filesize
-            return [StorageAllocation(byte_range=(0, filesize), storage=best_storage)]
+        if space <= best_storage.free_space:
+            best_storage.allocated_space += space
+            return [StorageAllocation(byte_range=(0, space), storage=best_storage)]
         else:
-            return list(self.allocate_many(filesize))
+            return list(self.allocate_many(space))

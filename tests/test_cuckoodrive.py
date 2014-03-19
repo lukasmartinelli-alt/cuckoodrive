@@ -4,7 +4,7 @@ from pytest import fixture
 from fs.memoryfs import MemoryFS
 from fs.wrapfs.limitsizefs import LimitSizeFS
 
-from drive.cuckoodrive import StorageProvider, StorageAllocation, StorageAllocator
+from drive.cuckoodrive import Storage, StorageAllocation, StorageAllocator
 
 
 def mb(value):
@@ -19,25 +19,30 @@ def mb(value):
 class TestStorageAllocator:
     @fixture
     def allocator(self):
-        self.dropbox = StorageProvider(name="dropbox", fs=LimitSizeFS(MemoryFS(), mb(230)))
-        self.googledrive = StorageProvider(name="googledrive", fs=LimitSizeFS(MemoryFS(), mb(120)))
-        return StorageAllocator(providers=[self.dropbox, self.googledrive])
+        dropbox = Storage(name="dropbox", fs=LimitSizeFS(MemoryFS(), mb(220)), max_filesize=mb(100))
+        googledrive = Storage(name="googledrive", fs=LimitSizeFS(MemoryFS(), mb(110)), max_filesize=mb(100))
+        return StorageAllocator(storages=[dropbox, googledrive])
 
     def test_write_small_file_returns_location_with_most_free_space(self, allocator):
         #Arrange
         filesize = mb(30)
+        dropbox = allocator.storages[0]
         #Act
         allocations = allocator.allocate(filesize)
         #Assert
-        assert StorageAllocation((mb(0), mb(30)), self.dropbox) == allocations[0]
-    
+        assert StorageAllocation((mb(0), mb(30)), dropbox) == allocations[0]
+
     def test_write_big_file_returns_multiple_allocations(self, allocator):
         #Arrange
         filesize = mb(330)
+        dropbox = allocator.storages[0]
+        googledrive = allocator.storages[1]
         #Act
         allocations = allocator.allocate(filesize)
         #Assert
-        assert allocations == [StorageAllocation((mb(0), mb(100)), self.dropbox),
-                               StorageAllocation((mb(100), mb(200)), self.dropbox),
-                               StorageAllocation((mb(200), mb(300)), self.googledrive),
-                               StorageAllocation((mb(300), mb(330)), self.googledrive)]
+        expected_allocations = [StorageAllocation((mb(0), mb(100)), dropbox),
+                                StorageAllocation((mb(100), mb(200)), dropbox),
+                                StorageAllocation((mb(200), mb(300)), googledrive),
+                                StorageAllocation((mb(300), mb(320)), dropbox),
+                                StorageAllocation((mb(320), mb(330)), googledrive)]
+        assert expected_allocations == allocations
