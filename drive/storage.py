@@ -1,10 +1,6 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 
 
-class CuckooDriveFS:
-    pass
-
-
 class Storage:
     """A Storage encapsulates a remote filesystem"""
 
@@ -64,6 +60,7 @@ class StorageAllocation:
     @property
     def size(self):
         return self.byte_range[1] - self.byte_range[0]
+
 
 class StorageAllocator:
     """The StorageAllocator allocates space for files on different storages.

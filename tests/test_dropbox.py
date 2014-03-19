@@ -10,6 +10,7 @@ from fs.errors import ResourceNotFoundError, ResourceInvalidError, DestinationEx
 from drive.providers.dropbox import DropboxFS
 
 
+# noinspection PyMethodMayBeStatic
 class TestDropboxFs:
     """Integration test of the DropboxFS using a real dropbox folder"""
     @fixture
@@ -59,12 +60,11 @@ class TestDropboxFs:
         #Arrange
         path = "new_file"
         text = "Lorem ipsum"
-        with fs.open(path, "w") as file:
-            file.write(text)
+        with fs.open(path, "w") as f:
+            f.write(text)
         #Act
-        written_text = ""
-        with fs.open(path, "r") as file:
-            written_text = file.read()
+        with fs.open(path, "r") as f:
+            written_text = f.read()
         #Assert
         assert text == written_text
 
@@ -72,9 +72,8 @@ class TestDropboxFs:
         #Arrange
         path = "new_binary_file"
         #Act
-        file = fs.open(path, "wb")
-        file.write(urandom(1024))
-        file.close()
+        with  fs.open(path, "wb") as f:
+            f.write(urandom(1024))
         #Assert
         assert fs.exists(path)
 
@@ -82,8 +81,8 @@ class TestDropboxFs:
         #Arrange
         path = "new_text_file"
         #Act
-        with fs.open(path, "w") as file:
-            file.write(str(urandom(1024)))
+        with fs.open(path, "w") as f:
+            f.write(str(urandom(1024)))
         #Assert
         assert fs.exists(path)
 
@@ -163,8 +162,8 @@ class TestDropboxFs:
     def test_removedir_raises_error_for_file(self, fs):
         #Arrange
         path = "im_a_file_and_not_a_dir.txt"
-        with fs.open(path, 'w') as file:
-            file.write(str(urandom(1024)))
+        with fs.open(path, 'w') as f:
+            f.write(str(urandom(1024)))
         #Act & Assert
         with raises(ResourceInvalidError):
             fs.removedir(path)
@@ -199,4 +198,4 @@ class TestDropboxFs:
         #Act
         desc = fs.desc(path)
         #Assert
-        desc == path + " in Dropbox"
+        assert desc == path + " in Dropbox"

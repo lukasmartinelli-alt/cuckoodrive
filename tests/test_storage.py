@@ -4,7 +4,7 @@ from pytest import fixture
 from fs.memoryfs import MemoryFS
 from fs.wrapfs.limitsizefs import LimitSizeFS
 
-from drive.cuckoodrive import Storage, StorageAllocation, StorageAllocator
+from drive.storage import Storage, StorageAllocation, StorageAllocator
 
 
 def mb(value):

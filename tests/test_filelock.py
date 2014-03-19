@@ -7,6 +7,7 @@ from fs.memoryfs import MemoryFS
 from drive.filelock import FileLock, FileLockError
 
 
+# noinspection PyMethodMayBeStatic
 class TestFileLock:
     """Test implementation of the FileLock"""
 
