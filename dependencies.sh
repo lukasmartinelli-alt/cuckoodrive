@@ -1,3 +1,4 @@
+#!/bin/sh
 mkdir .tmp
 cd .tmp
 

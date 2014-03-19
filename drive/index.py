@@ -18,7 +18,7 @@ class Index(PathMap):
         """Recursively go through the filesystem and add files to the PathMap"""
         for item in self.fs.listdir(path):
             absolute_path = pathjoin(path, item)
-            if(self.fs.isdir(absolute_path)):
+            if self.fs.isdir(absolute_path):
                 self._build(absolute_path)
             else:
                 self[absolute_path] = self.fs.getinfo(absolute_path)

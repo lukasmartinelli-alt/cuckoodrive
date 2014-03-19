@@ -5,5 +5,4 @@ coveralls
 dropbox==2.0.0
 google-api-python-client==1.2
 box.py==1.2.8
-python-skydrive==13.12.1
 mega.py==0.9.18

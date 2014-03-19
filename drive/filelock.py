@@ -6,8 +6,15 @@ from fs.errors import FSError
 import time
 
 
-class FileLockException(Exception):
-    pass
+class FileLockError(Exception):
+    def __init__(self, message, filename):
+        """
+        Create an Error that happened because of a file lock.
+        :param message: Error message
+        :param filename: Name of the file that was locked
+        """
+        Exception.__init__(self, message)
+        self.filename = filename
 
 
 class FileLock(object):
@@ -22,13 +29,19 @@ class FileLock(object):
         Original Repository: https://github.com/dmfrey/FileLock
     """
 
-    def __init__(self, fs, file_name=".lock", timeout=10, delay=.05):
+    def __init__(self, fs, filename=".lock", timeout=10, delay=.5):
         """ Prepare the file locker. Specify the file to lock and optionally
             the maximum timeout and the delay between each attempt to lock.
+        :param fs: Filesystem implementation to use for locking
+        :param filename: Name of the file that is used as a lock file.
+        :param timeout: Timeout used when trying to acquire a lock
+        If timeout is reached, a FileLockError is raised
+        :param delay: Delay between checks weather there is a lockfile
         """
         self.fs = fs
         self.is_locked = False
-        self.file_name = file_name
+        self.filename = filename
+        self.lockfile = None
         self.timeout = timeout
         self.delay = delay
 
@@ -41,12 +54,12 @@ class FileLock(object):
         start_time = time.time()
         while True:
             try:
-                if not self.fs.exists(self.file_name):
-                    self.lockfile = self.fs.open(self.file_name, 'w')
+                if not self.fs.exists(self.filename):
+                    self.lockfile = self.fs.open(self.filename, 'w')
                     break
                 else:
                     if (time.time() - start_time) >= self.timeout:
-                        raise FileLockException("Timeout occured.")
+                        raise FileLockError("Timeout occured.", self.filename)
                     time.sleep(self.delay)
             except FSError:
                 raise
@@ -59,7 +72,7 @@ class FileLock(object):
         """
         if self.is_locked:
             self.lockfile.close()
-            self.fs.remove(self.file_name)
+            self.fs.remove(self.filename)
             self.is_locked = False
 
     def __enter__(self):

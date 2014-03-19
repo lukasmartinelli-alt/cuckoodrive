@@ -13,8 +13,8 @@ def test_fs():
     fs = MemoryFS()
 
     def create_file(path, size):
-        with fs.open(path, "wb") as file:
-            file.write(urandom(size))
+        with fs.open(path, "wb") as f:
+            f.write(urandom(size))
 
     fs.makedir("Backups")
     create_file("Backups/backup-2014-01-14.tar.gz", 130 * 1024)

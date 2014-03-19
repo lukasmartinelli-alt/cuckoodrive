@@ -4,11 +4,12 @@ from pytest import fixture, raises
 
 from fs.memoryfs import MemoryFS
 
-from drive.filelock import FileLock, FileLockException
+from drive.filelock import FileLock, FileLockError
 
 
 class TestFileLock:
     """Test implementation of the FileLock"""
+
     @fixture
     def fs(self, request):
         """Create a MemoryFS for testing. The finalizer removes all files in it"""
@@ -30,6 +31,6 @@ class TestFileLock:
         #Arrange
         with fs.open(".lock", "w"):
             #Act & Assert
-            with raises(FileLockException):
+            with raises(FileLockError):
                 with FileLock(fs, timeout=1):
                     assert False  # We shouldnt get the lock
