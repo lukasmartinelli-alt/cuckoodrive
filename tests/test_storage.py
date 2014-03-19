@@ -16,6 +16,7 @@ def mb(value):
     return value * 1024 * 1024
 
 
+# noinspection PyMethodMayBeStatic
 class TestStorageAllocator:
     @fixture
     def allocator(self):
