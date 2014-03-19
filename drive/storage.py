@@ -97,8 +97,8 @@ class StorageAllocator:
         """
         total_free_space = sum([p.free_space for p in self.storages])
         if space > total_free_space:
-            raise StorageSizeError(message="File with size " + space + "  is too big to store on CuckooDrive."
-                                           + "Total free space available is " + total_free_space)
+            raise StorageSizeError("""File with size {0} is too big to store.
+            Total free space available is {1}.""".format(space, total_free_space))
         best_storage = self.best_storage()
         if space <= best_storage.free_space:
             best_storage.allocated_space += space

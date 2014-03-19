@@ -1,10 +1,10 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from pytest import fixture
+from pytest import fixture, raises
 from fs.memoryfs import MemoryFS
 from fs.wrapfs.limitsizefs import LimitSizeFS
 
-from drive.storage import Storage, StorageAllocation, StorageAllocator
+from drive.storage import Storage, StorageAllocation, StorageAllocator, StorageSizeError
 
 
 def mb(value):
@@ -31,6 +31,13 @@ class TestStorageAllocator:
         allocations = allocator.allocate(filesize)
         #Assert
         assert StorageAllocation((mb(0), mb(30)), dropbox) == allocations[0]
+
+    def test_write_too_big_file_raises_error(self, allocator):
+        #Arrange
+        filesize = mb(331)
+        #Act & Assert
+        with raises(StorageSizeError):
+            allocator.allocate(filesize)
 
     def test_write_big_file_returns_multiple_allocations(self, allocator):
         #Arrange
