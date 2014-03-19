@@ -30,7 +30,7 @@ class TestStorageAllocator:
         allocations = allocator.allocate(filesize)
         #Assert
         assert StorageAllocation((mb(0), mb(30)), self.dropbox) == allocations[0]
-
+    
     def test_write_big_file_returns_multiple_allocations(self, allocator):
         #Arrange
         filesize = mb(330)
