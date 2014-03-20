@@ -1,75 +1,86 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
-from fs.base import FS
-from fs.path import normpath
-from pytest import fixture
 
-from dropbox.client import DropboxClient
-from fs.errors import ResourceNotFoundError, ResourceInvalidError, DestinationExistsError
+from _pytest.python import fixture, raises
 
-from drive.providers.dropbox import DropboxFS
-from tests.test_fs import FSTestBase
+from fs.memoryfs import MemoryFS, MemoryFile
+from fs.wrapfs.limitsizefs import LimitSizeFS
 
+from drive.cuckoofs import CuckooFile, FileAllocator, AllocationSizeError
+from fs.wrapfs.readonlyfs import
 
-class CuckooFS(FS):
+def mb(value):
     """
-    Writes to many underlying storage providers implemented as remote filesystems.
+    Helper method to return value in MB as value in Bytes
+    :param value in Megabytes
+    :return: value in Bytes
     """
-    _meta = {
-        "network": True,
-        "virtual": True,
-        "read_only": False,
-        "unicode_paths": True,
-        "case_insensitive_paths": False,
-        "atomic.move": True,
-        "atomic.copy": True,
-        "atomic.makedir": True,
-        "atomic.rename": True,
-        "atomic.setcontents": True,
-        "file.read_and_write": False,
-    }
-
-    def __str__(self):
-        return "<CuckooFS: {0}>".format(self.root_path)
-
-    # --------------------------------------------------------------------
-    # Essential Methods as defined in
-    # https://pythonhosted.org/fs/implementersguide.html#essential-methods
-    # --------------------------------------------------------------------
-    @synchronize
-    def open(self, path, mode="rb", **kwargs):
-        path = normpath(path).lstrip('/')
-
-        if "r" in mode:
-            if not self.exists(path):
-                raise ResourceNotFoundError(path)
-            if self.isdir(path):
-                raise ResourceInvalidError(path)
-        file = DropboxFile(self, path, mode)
-        return file
-
-    # ------------------------------------------------------------------------
-    # Non-Essential Methods as defined in
-    # https://pythonhosted.org/fs/implementersguide.html#non-essential-methods
-    # ------------------------------------------------------------------------
-
-    def desc(self, path):
-        return "%s in CuckooDrive" % path
+    return value * 1024 * 1024
 
 
 # noinspection PyMethodMayBeStatic
-class TestCuckooFS(FSTestBase):
-    """Integration test of the DropboxFS using a real dropbox folder"""
+class TestFileAllocator:
+    @fixture
+    def allocator(self):
+        dropbox = LimitSizeFS(MemoryFS(), mb(220))
+        googledrive = LimitSizeFS(MemoryFS(), mb(110))
+        return FileAllocator(filesystems=[dropbox, googledrive], allocation_size=mb(10))
+    def test_allocate_file_returns_new_file(self, allocator):
+        #Act
+        f = allocator.allocate_file("bigfile.tar.gz")
+        #Assert
+        assert isinstance(f.__class__, MemoryFile.__class__)
+
+    def test_allocate_file_raises_error_when_size_too_big(self, allocator):
+        #Arrange
+        allocator.allocation_size = mb(300)
+        #Act & Assert
+        with raises(AllocationSizeError):
+            allocator.allocate_file("bigfile.tar.gz")
+
+    def test_best_fs_returns_fs_with_most_space(self, allocator):
+        #Act
+        best_fs = allocator.best_fs()
+        #Assert
+        assert best_fs == allocator.filesystems[0]
+
+    def test_free_space_returns_space_left_inclusive_allcoations(self, allocator):
+        #Arrange
+        dropbox = allocator.filesystems[0]
+        googledrive = allocator.filesystems[1]
+        allocator.allocations[dropbox] = mb(100)
+        #Act
+        dropbox_free_space = allocator.free_space(dropbox)
+        googledrive_free_space = allocator.free_space(googledrive)
+        #Assert
+        assert dropbox_free_space == mb(120)
+        assert googledrive_free_space == mb(110)
+
+
+# noinspection PyMethodMayBeStatic
+class TestCuckooFile:
+    @fixture
+    def allocator(self):
+        dropbox = LimitSizeFS(MemoryFS(), mb(220))
+        googledrive = LimitSizeFS(MemoryFS(), mb(110))
+        return FileAllocator(filesystems=[dropbox, googledrive], allocation_size=mb(10))
 
     @fixture
-    def fs(self, request):
-        fs = CuckooFS()
-        return fs
+    def test_file(self, allocator):
+        return CuckooFile(path="bigfile.tar.gz", file_allocator=allocator)
 
-    def test_desc_returns_storage_name_and_path(self, fs):
-        #Arrange
-        path = "hello_i_am_mr_folder"
-        #Act
-        desc = fs.desc(path)
-        #Assert
-        assert desc == path + " in CuckooDrive"
+    def test_write(self, test_file):
+        test_file.write("salalalalalalala")
+        test_file.close()
+
+    def test_read(self):
+        pass
+
+    def test_seek(self):
+        pass
+
+    def test_tell(self):
+        pass
+
+    def test_truncate(self):
+        pass

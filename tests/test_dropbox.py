@@ -2,14 +2,9 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 from pytest import fixture
 
-
 from dropbox.client import DropboxClient
-from fs.errors import ResourceNotFoundError, ResourceInvalidError, DestinationExistsError
 
 from drive.providers.dropbox import DropboxFS
-
-
-# noinspection PyMethodMayBeStatic
 from tests.test_fs import FSTestBase
 
 
