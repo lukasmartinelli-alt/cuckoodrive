@@ -139,8 +139,21 @@ class CuckooFile(FileLikeBase):
                 data = self._fill(data, part)
                 optional_flush(part)
 
+    def _read(self, sizehint=-1):
+        all_data = str()
+
+        for part in self._parts:
+            part.seek(offset=0, whence=0)
+            read_data = part.read(sizehint)
+            self._fpointer += len(read_data)
+            all_data += read_data
+            if all_data >= sizehint:
+                return all_data
+
+        return all_data
+
     def _seek(self, offset, whence):
-        if whence > 1:
+        if offset > 0 and whence > 1:
             raise NotImplementedError("Only seeking to start is implemented yet.")
 
         for part in self._parts:

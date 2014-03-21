@@ -9,39 +9,39 @@ from os import urandom
 from drive.cuckoofs import CuckooRemoteFS, CuckooFile, CuckooFilePart, CuckooFilePartMissingError
 
 
-def mb(value):
+def kb(value):
     """
-    Helper method to return value in MB as value in Bytes
-    :param value in Megabytes
+    Helper method to return value in KB as value in Bytes
+    :param value in Kilobytes
     :return: value in Bytes
     """
-    return value * 1024 * 1024
+    return value * 1024
 
 
 class TestCuckooRemoteFS:
     @fixture
     def remote_fs(self):
-        return CuckooRemoteFS(MemoryFS(), mb(100))
+        return CuckooRemoteFS(MemoryFS(), kb(100))
 
     def test_free_space_returns_difference_between_max_size_and_cur_size(self, remote_fs):
         #Arrange
-        remote_fs.cur_size = mb(30)
+        remote_fs.cur_size = kb(30)
         #Act
         free_space = remote_fs.free_space()
         #Assert
-        assert free_space == mb(70)
+        assert free_space == kb(70)
 
 
 class TestCuckooFile:
     @fixture
     def remote_filesystems(self):
         return [
-            CuckooRemoteFS(MemoryFS(), mb(120)),
-            CuckooRemoteFS(MemoryFS(), mb(220))]
+            CuckooRemoteFS(MemoryFS(), kb(120)),
+            CuckooRemoteFS(MemoryFS(), kb(220))]
 
     @fixture
     def cuckoo_file(self, remote_filesystems):
-        return CuckooFile(path="cuckoo.tar", mode="wb+", max_part_size=mb(4),
+        return CuckooFile(path="cuckoo.tar", mode="wb+", max_part_size=kb(4),
                           remote_filesystems=remote_filesystems)
 
     @fixture
@@ -54,7 +54,7 @@ class TestCuckooFile:
             f = fs.open(path, mode)
             cf = CuckooFilePart(f, mode, cuckoo_file.max_part_size, fs, path)
             if i == 3:
-                cf.write(urandom(mb(2)))
+                cf.write(urandom(kb(2)))
             else:
                 cf.write(urandom(cuckoo_file.max_part_size))
             parts.append(cf)
@@ -71,7 +71,7 @@ class TestCuckooFile:
         #Arrange
         cuckoo_file._expand()
         #Act
-        data = cuckoo_file._fill(data=urandom(mb(3)), part=cuckoo_file._parts[0])
+        data = cuckoo_file._fill(data=urandom(kb(3)), part=cuckoo_file._parts[0])
         #Assert
         assert data is None
 
@@ -79,9 +79,9 @@ class TestCuckooFile:
         #Arrange
         cuckoo_file._expand()
         #Act
-        data = cuckoo_file._fill(data=urandom(mb(5)), part=cuckoo_file._parts[0])
+        data = cuckoo_file._fill(data=urandom(kb(5)), part=cuckoo_file._parts[0])
         #Assert
-        assert len(data) == mb(1)
+        assert len(data) == kb(1)
 
     def test_current_part_returns_none_if_no_parts_exist(self, cuckoo_file):
         #Act & Assert
@@ -90,7 +90,7 @@ class TestCuckooFile:
     def test_current_part_returns_last_part_when_file_pointer_is_on_last_byte(self, cuckoo_file, cuckoo_file_parts):
         #Arrange
         cuckoo_file._parts = cuckoo_file_parts
-        cuckoo_file._fpointer = 2 * mb(4) + mb(2)
+        cuckoo_file._fpointer = 2 * kb(4) + kb(2)
 
          #Act & Assert
         assert cuckoo_file.current_part == cuckoo_file_parts[2]
@@ -98,41 +98,58 @@ class TestCuckooFile:
     def test_current_part_returns_first_part_when_file_pointer_is_there(self, cuckoo_file, cuckoo_file_parts):
         #Arrange
         cuckoo_file._parts = cuckoo_file_parts
-        cuckoo_file._fpointer = 1 * mb(3)
+        cuckoo_file._fpointer = 1 * kb(3)
         #Act & Assert
         assert cuckoo_file.current_part == cuckoo_file_parts[0]
 
     def test_current_part_returns_first_part_when_file_pointer_is_max_part_size(self, cuckoo_file, cuckoo_file_parts):
         #Arrange
         cuckoo_file._parts = cuckoo_file_parts
-        cuckoo_file._fpointer = 1 * mb(4)
+        cuckoo_file._fpointer = 1 * kb(4)
         #Act & Assert
         assert cuckoo_file.current_part == cuckoo_file_parts[0]
 
     def test_current_part_raises_error_when_file_pointer_is_bigger_than_parts(self, cuckoo_file, cuckoo_file_parts):
         #Arrange
         cuckoo_file._parts = cuckoo_file_parts
-        cuckoo_file._fpointer = 4 * mb(4)
+        cuckoo_file._fpointer = 4 * kb(4)
         #Act & Assert
         with raises(CuckooFilePartMissingError):
             _ = cuckoo_file.current_part
 
     def test_write_set_file_pointer_to_last_position(self, cuckoo_file):
         #Act
-        cuckoo_file._write(urandom(mb(1)))
+        cuckoo_file._write(urandom(kb(1)))
         #Assert
-        assert cuckoo_file._fpointer == mb(1)
+        assert cuckoo_file._fpointer == kb(1)
 
     def test_write_small_amount_is_written_to_first_part(self, cuckoo_file):
         #Act
-        cuckoo_file._write(urandom(mb(1)), flushing=True)
+        cuckoo_file._write(urandom(kb(1)), flushing=True)
         cuckoo_file._seek(offset=0, whence=1)
         #Assert
-        assert mb(1) == len(cuckoo_file._parts[0].read())
+        assert kb(1) == len(cuckoo_file._parts[0].read())
 
     def test_write_big_amount_expands_to_parts(self, cuckoo_file):
         #Act
-        cuckoo_file._write(urandom(mb(12)), flushing=True)
+        cuckoo_file._write(urandom(kb(12)), flushing=True)
         cuckoo_file._seek(offset=0, whence=1)
         #Assert
         assert len(cuckoo_file._parts) == 3
+
+    def test_read_returns_what_was_written(self, cuckoo_file):
+        #Arrange
+        data = urandom(kb(5))
+        cuckoo_file._write(data, flushing=True)
+        cuckoo_file._seek(offset=0, whence=1)
+        #Act & Assert
+        assert len(data) == len(cuckoo_file._read())
+
+    def test_read_returns_data_with_given_sizehint(self, cuckoo_file):
+        #Arrange
+        cuckoo_file._write(urandom(kb(5)))
+        #Act
+        data = cuckoo_file._read(sizehint=kb(1))
+        #Assert
+        assert len(data) == kb(1)
+
