@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 from os import urandom
-
-from _pytest import fixture, raises
+from _pytest.python import fixture, raises
 
 from fs.errors import ResourceNotFoundError, ResourceInvalidError, DestinationExistsError
 

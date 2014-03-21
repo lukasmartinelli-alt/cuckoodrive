@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from fs.errors import FSError
 from fs.filelike import FileLikeBase
-from fs.path import pathjoin
 from fs.wrapfs.limitsizefs import LimitSizeFS, LimitSizeFile
+
+
+class CuckooFilePartMissingError(Exception):
+    pass
 
 
 class CuckooRemoteFS(LimitSizeFS):
@@ -67,57 +69,86 @@ class CuckooFile(FileLikeBase):
         # Fields for file functionality
         self._parts = []
         self._fpointer = 0  # Current position of the file pointer
-        self._expand()
 
     @property
     def best_fs(self):
         """Returns the filesystem that has the most free space."""
         return max(self.remote_filesystems, key=lambda fs: fs.free_space())
 
-    def _fill(self, data):
-        """File the current_part up with the given data and return the data
-        that could not be written.
+    def _fill(self, data, part):
+        """File the given part up with the given data and return the data
+        that could not be written. If all data has been written return None.
         :param data: The data to write to the current_part
         """
         space_left = self.max_part_size - (self._fpointer % self.max_part_size)
-        self.current_part.write(data[0:space_left])
-        self._fpointer += len(data[0:space_left])
-        return data[space_left:]
+        if len(data) < space_left:
+            part.write(data)
+            return None
+        else:
+            part.write(data[0:space_left])
+            self._fpointer += len(data[0:space_left])
+            return data[space_left:]
 
     def _expand(self):
-        """Expand the current_part to a new file. This will flush the old current_part and close the
-        file handle."""
-        self.current_part.close()
+        """Expand the current_part to a new file and return it."""
         new_part = self.best_fs.open(
-            path=pathjoin(self.path, ".part{0}".format(len(self._parts))),
+            path=self.path + ".part{0}".format(len(self._parts)),
             mode=self.mode)
         self._parts.append(new_part)
+        return new_part
 
     @property
     def current_part(self):
         """Calculates the current part by looking up in which part the file pointer must be"""
+        if len(self._parts) == 0:
+            return None
+
         size = 0
         for part in self._parts:
-            size += part.size
-            if size > self._fpointer:
+            size += self.max_part_size
+            if size >= self._fpointer:
                 return part
 
-        raise FSError("File pointer is no longer contained inside a part.")
+        raise CuckooFilePartMissingError("File pointer points to bytes that are in no part.")
 
     def _write(self, data, flushing=False):
         """
         Write the given data to the underlying storages. The CuckooFile expands to a new
         file automatically if _fpointer is getting bigger than the current_part
         """
-        def current_part_to_small():
-            return self._fpointer + len(data) > self.max_part_size
+        def data_is_bigger_than_max_part_size():
+            return data and self._fpointer + len(data) > self.max_part_size
 
-        if not current_part_to_small():
+        def optional_flush(flashable_part):
+            if flushing:
+                flashable_part.flush()
+
+        if not self.current_part:
+            self._expand()
+
+        if not data_is_bigger_than_max_part_size():
             self.current_part.write(data)
+            optional_flush(self.current_part)
             self._fpointer += len(data)
         else:
-            while current_part_to_small():
-                data = self._fill(data)
-                self._expand()
-                self.current_part.write(data)
-                self._fpointer += len(data)
+            part = self.current_part
+            data = self._fill(data, part)
+            optional_flush(part)
+            while data_is_bigger_than_max_part_size():
+                part = self._expand()
+                data = self._fill(data, part)
+                optional_flush(part)
+
+    def _seek(self, offset, whence):
+        if whence > 1:
+            raise NotImplementedError("Only seeking to start is implemented yet.")
+
+        for part in self._parts:
+            part.seek(offset)
+
+        self._fpointer = offset
+
+    def close(self):
+        for part in self._parts:
+            part.close()
+        super(CuckooFile, self).close()
