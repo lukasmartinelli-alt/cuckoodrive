@@ -1,6 +1,6 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from _pytest.python import fixture, raises
+from pytest import fixture, raises
 
 from fs.memoryfs import MemoryFS
 

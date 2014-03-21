@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from _pytest.python import fixture
+from pytest import fixture
 
 from dropbox.client import DropboxClient
 
