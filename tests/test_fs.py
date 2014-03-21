@@ -2,10 +2,11 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 from os import urandom
 
-from pytest import fixture, raises
+from _pytest import fixture, raises
+
 from fs.errors import ResourceNotFoundError, ResourceInvalidError, DestinationExistsError
 
-# noinspection PyMethodMayBeStatic
+
 class FSTestBase:
     """A generic test against implementations of the pyfilesystem interface"""
     @fixture

@@ -1,13 +1,12 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from pytest import fixture, raises
+from _pytest import fixture, raises
 
 from fs.memoryfs import MemoryFS
 
 from drive.filelock import FileLock, FileLockError
 
 
-# noinspection PyMethodMayBeStatic
 class TestFileLock:
     """Test implementation of the FileLock"""
 
