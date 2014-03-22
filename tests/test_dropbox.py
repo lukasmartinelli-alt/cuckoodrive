@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from pytest import fixture
+from pytest import fixture, mark
 
 from dropbox.client import DropboxClient
 
@@ -9,6 +9,7 @@ from drive.providers.dropbox import DropboxFS
 from tests.test_fs import FSTestBase
 
 
+@mark.slowtest
 class TestDropboxFS(FSTestBase):
     """Integration test of the DropboxFS using a real dropbox folder"""
     @fixture
