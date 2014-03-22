@@ -89,6 +89,17 @@ class CuckooFile(FileLikeBase):
             self._fpointer += len(data[0:space_left])
             return data[space_left:]
 
+    def _next(self):
+        """Open and return the next part of the current_part"""
+        next_index = self._parts.index(self.current_part) + 1
+        if next_index < len(self._parts):
+            next_part = self._parts[next_index]
+            if next_part.closed:
+                next_part.fs.open(next_part.path, next_part.mode)
+            return next_part
+        else:
+            return None
+
     def _expand(self):
         """Expand the current_part to a new file and return it."""
         new_part = self.best_fs.open(
@@ -116,6 +127,7 @@ class CuckooFile(FileLikeBase):
         Write the given data to the underlying storages. The CuckooFile expands to a new
         file automatically if _fpointer is getting bigger than the current_part
         """
+
         def data_is_bigger_than_max_part_size():
             return data and self._fpointer + len(data) > self.max_part_size
 
@@ -139,18 +151,41 @@ class CuckooFile(FileLikeBase):
                 data = self._fill(data, part)
                 optional_flush(part)
 
-    def _read(self, sizehint=-1):
+    def _readall(self):
         all_data = str()
-
         for part in self._parts:
-            part.seek(offset=0, whence=0)
-            read_data = part.read(sizehint)
-            self._fpointer += len(read_data)
-            all_data += read_data
-            if all_data >= sizehint:
-                return all_data
-
+            part_data = part.read()
+            self._fpointer += len(part_data)
+            all_data += part_data
         return all_data
+
+    def _readbuffered(self, sizehint):
+        if sizehint > self.max_part_size:
+            raise NotImplementedError("Cannot read chunks bigger than a single part yet")
+        unread_space = (self._fpointer % self.max_part_size)
+
+        if self._fpointer == sum(part.size for part in self._parts):
+            return None
+
+        if unread_space + sizehint > self.current_part.size:
+            part_data = self.current_part.read(unread_space)
+            self._fpointer += len(part_data)
+
+            next_part = self._next()
+            next_part.seek(offset=0, whence=0)
+            next_part_data = next_part.read(sizehint - unread_space)
+            self._fpointer += len(next_part_data)
+            return part_data + next_part_data
+        else:
+            part_data = self.current_part.read(sizehint)
+            self._fpointer += len(part_data)
+            return part_data
+
+    def _read(self, sizehint=-1):
+        if sizehint > 0:
+            return self._readbuffered(sizehint)
+        else:
+            return self._readall()
 
     def _seek(self, offset, whence):
         if offset > 0 and whence > 1:
@@ -165,3 +200,4 @@ class CuckooFile(FileLikeBase):
         for part in self._parts:
             part.close()
         super(CuckooFile, self).close()
+

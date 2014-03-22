@@ -145,11 +145,28 @@ class TestCuckooFile:
         #Act & Assert
         assert len(data) == len(cuckoo_file._read())
 
+    def test_read_raises_error_when_sizehint_is_bigger_than_max_part_size(self, cuckoo_file):
+        #Act & Assert
+        with raises(NotImplementedError):
+            cuckoo_file._read(sizehint=kb(5))
+
     def test_read_returns_data_with_given_sizehint(self, cuckoo_file):
         #Arrange
-        cuckoo_file._write(urandom(kb(5)))
+        cuckoo_file._write(urandom(kb(5)), flushing=True)
+        cuckoo_file._seek(offset=0, whence=0)
         #Act
         data = cuckoo_file._read(sizehint=kb(1))
         #Assert
         assert len(data) == kb(1)
+
+    def test_read_returns_none_when_eof_reached(self, cuckoo_file):
+        #Arrange
+        cuckoo_file._write(urandom(kb(4)), flushing=True)
+        cuckoo_file._seek(offset=0, whence=0)
+        #Act
+        chunk1 = cuckoo_file._read(sizehint=kb(2))
+        chunk2 = cuckoo_file._read(sizehint=kb(2))
+        eof = cuckoo_file._read(sizehint=kb(2))
+        #Assert
+        assert eof is None
 
