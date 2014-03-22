@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from pytest import fixture, raises
+from pytest import fixture, raises, mark
 
 from fs.memoryfs import MemoryFS
 from os import urandom
@@ -92,7 +92,7 @@ class TestCuckooFile:
         cuckoo_file._parts = cuckoo_file_parts
         cuckoo_file._fpointer = 2 * kb(4) + kb(2)
 
-         #Act & Assert
+        #Act & Assert
         assert cuckoo_file.current_part == cuckoo_file_parts[2]
 
     def test_current_part_returns_first_part_when_file_pointer_is_there(self, cuckoo_file, cuckoo_file_parts):
@@ -142,8 +142,10 @@ class TestCuckooFile:
         data = urandom(kb(5))
         cuckoo_file._write(data, flushing=True)
         cuckoo_file._seek(offset=0, whence=1)
+        #Act
+        read_data = cuckoo_file._read()
         #Act & Assert
-        assert len(data) == len(cuckoo_file._read())
+        assert len(data) == len(read_data)
 
     def test_read_raises_error_when_sizehint_is_bigger_than_max_part_size(self, cuckoo_file):
         #Act & Assert
@@ -183,3 +185,13 @@ class TestCuckooFile:
         #Assert
         assert eof is None
 
+    @mark.xfail
+    def test_read_after_file_has_been_reopened(self, remote_filesystems):
+        #Arrange
+        with CuckooFile("cuckoo.tar", "wb", remote_filesystems, kb(4)) as cuckoo_file:
+            cuckoo_file._write(urandom(kb(6)))
+        #Act
+        with CuckooFile("cuckoo.tar", "rb", remote_filesystems, kb(4)) as cuckoo_file:
+            read_data = cuckoo_file._read()
+        #Assert
+        assert len(read_data) == kb(6)

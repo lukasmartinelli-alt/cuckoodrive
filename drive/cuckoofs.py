@@ -152,7 +152,7 @@ class CuckooFile(FileLikeBase):
                 optional_flush(part)
 
     def _readall(self):
-        all_data = str()
+        all_data = bytes()
         for part in self._parts:
             part_data = part.read()
             self._fpointer += len(part_data)
@@ -207,4 +207,3 @@ class CuckooFile(FileLikeBase):
         for part in self._parts:
             part.close()
         super(CuckooFile, self).close()
-
