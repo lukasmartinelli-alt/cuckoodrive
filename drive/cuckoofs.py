@@ -89,7 +89,7 @@ class CuckooFile(FileLikeBase):
             self._fpointer += len(data[0:space_left])
             return data[space_left:]
 
-    def _next(self):
+    def _next_part(self):
         """Open and return the next part of the current_part"""
         next_index = self._parts.index(self.current_part) + 1
         if next_index < len(self._parts):
@@ -100,7 +100,7 @@ class CuckooFile(FileLikeBase):
         else:
             return None
 
-    def _expand(self):
+    def _expand_part(self):
         """Expand the current_part to a new file and return it."""
         new_part = self.best_fs.open(
             path=self.path + ".part{0}".format(len(self._parts)),
@@ -136,7 +136,7 @@ class CuckooFile(FileLikeBase):
                 flashable_part.flush()
 
         if not self.current_part:
-            self._expand()
+            self._expand_part()
 
         if not data_is_bigger_than_max_part_size():
             self.current_part.write(data)
@@ -147,7 +147,7 @@ class CuckooFile(FileLikeBase):
             data = self._fill(data, part)
             optional_flush(part)
             while data_is_bigger_than_max_part_size():
-                part = self._expand()
+                part = self._expand_part()
                 data = self._fill(data, part)
                 optional_flush(part)
 
@@ -160,20 +160,27 @@ class CuckooFile(FileLikeBase):
         return all_data
 
     def _readbuffered(self, sizehint):
+
+        def eof_reached():
+            return self._fpointer == sum(part.size for part in self._parts)
+
         if sizehint > self.max_part_size:
             raise NotImplementedError("Cannot read chunks bigger than a single part yet")
-        unread_space = (self._fpointer % self.max_part_size)
+        read_space = (self._fpointer % self.max_part_size)
 
-        if self._fpointer == sum(part.size for part in self._parts):
+        if eof_reached():
             return None
 
-        if unread_space + sizehint > self.current_part.size:
-            part_data = self.current_part.read(unread_space)
+        if read_space + sizehint > self.current_part.size:
+            part_data = self.current_part.read(self.current_part.size - read_space)
             self._fpointer += len(part_data)
 
-            next_part = self._next()
+            if eof_reached():
+                return part_data
+
+            next_part = self._next_part()
             next_part.seek(offset=0, whence=0)
-            next_part_data = next_part.read(sizehint - unread_space)
+            next_part_data = next_part.read(sizehint - len(part_data))
             self._fpointer += len(next_part_data)
             return part_data + next_part_data
         else:

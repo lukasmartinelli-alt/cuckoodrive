@@ -69,7 +69,7 @@ class TestCuckooFile:
 
     def test_fill_with_less_data_returns_none(self, cuckoo_file):
         #Arrange
-        cuckoo_file._expand()
+        cuckoo_file._expand_part()
         #Act
         data = cuckoo_file._fill(data=urandom(kb(3)), part=cuckoo_file._parts[0])
         #Assert
@@ -77,7 +77,7 @@ class TestCuckooFile:
 
     def test_fill_with_too_much_data_returns_unwritten_data(self, cuckoo_file):
         #Arrange
-        cuckoo_file._expand()
+        cuckoo_file._expand_part()
         #Act
         data = cuckoo_file._fill(data=urandom(kb(5)), part=cuckoo_file._parts[0])
         #Assert
@@ -159,13 +159,26 @@ class TestCuckooFile:
         #Assert
         assert len(data) == kb(1)
 
+    def test_read_in_chunks_returns_all_written_data(self, cuckoo_file):
+        #Arrange
+        cuckoo_file._write(urandom(kb(8)), flushing=True)
+        cuckoo_file._seek(offset=0, whence=0)
+        #Act
+        chunk1 = cuckoo_file._read(sizehint=kb(3))
+        chunk2 = cuckoo_file._read(sizehint=kb(3))
+        chunk3 = cuckoo_file._read(sizehint=kb(3))
+        #Assert
+        assert len(chunk1) == kb(3)
+        assert len(chunk2) == kb(3)
+        assert len(chunk3) == kb(2)
+
     def test_read_returns_none_when_eof_reached(self, cuckoo_file):
         #Arrange
         cuckoo_file._write(urandom(kb(4)), flushing=True)
         cuckoo_file._seek(offset=0, whence=0)
         #Act
-        chunk1 = cuckoo_file._read(sizehint=kb(2))
-        chunk2 = cuckoo_file._read(sizehint=kb(2))
+        cuckoo_file._read(sizehint=kb(2))
+        cuckoo_file._read(sizehint=kb(2))
         eof = cuckoo_file._read(sizehint=kb(2))
         #Assert
         assert eof is None
