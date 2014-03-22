@@ -137,6 +137,16 @@ class TestCuckooFile:
         #Assert
         assert len(cuckoo_file._parts) == 3
 
+    def test_read_returns_none_after_all_has_been_read(self, cuckoo_file):
+        #Arrange
+        cuckoo_file._write(urandom(kb(3)), flushing=True)
+        cuckoo_file._seek(offset=0, whence=0)
+        #Act
+        cuckoo_file._read()
+        eof = cuckoo_file._read()
+        #Assert
+        assert eof is None
+
     def test_read_returns_what_was_written(self, cuckoo_file):
         #Arrange
         data = urandom(kb(5))
@@ -195,3 +205,28 @@ class TestCuckooFile:
             read_data = cuckoo_file._read()
         #Assert
         assert len(read_data) == kb(6)
+
+    def test_seek_can_go_to_start_of_file(self, cuckoo_file):
+        #Arrange
+        cuckoo_file._write(urandom(kb(1)))
+        #Act
+        cuckoo_file._seek(offset=0, whence=0)
+        #Assert
+        assert cuckoo_file._fpointer == 0 and cuckoo_file.current_part == cuckoo_file._parts[0]
+
+    def test_seek_can_go_to_correct_part(self, cuckoo_file):
+        #Arrange
+        cuckoo_file._write(urandom(kb(6)))
+        #Act
+        cuckoo_file._seek(offset=kb(5), whence=0)
+        #Assert
+        assert cuckoo_file._fpointer == kb(5) and cuckoo_file.current_part == cuckoo_file._parts[1]
+
+    def test_tell_returns_file_pointer(self, cuckoo_file):
+        #Arrange
+        cuckoo_file._write(urandom(kb(5)))
+        #Act
+        cuckoo_file._seek(offset=kb(2), whence=0)
+        pos = cuckoo_file._tell()
+        #Assert
+        assert pos == kb(2)

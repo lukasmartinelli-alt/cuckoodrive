@@ -159,23 +159,17 @@ class CuckooFile(FileLikeBase):
             all_data += part_data
         return all_data
 
+    def _eof_reached(self):
+        return self._fpointer == sum(part.size for part in self._parts)
+
     def _readbuffered(self, sizehint):
-
-        def eof_reached():
-            return self._fpointer == sum(part.size for part in self._parts)
-
-        if sizehint > self.max_part_size:
-            raise NotImplementedError("Cannot read chunks bigger than a single part yet")
         read_space = (self._fpointer % self.max_part_size)
-
-        if eof_reached():
-            return None
 
         if read_space + sizehint > self.current_part.size:
             part_data = self.current_part.read(self.current_part.size - read_space)
             self._fpointer += len(part_data)
 
-            if eof_reached():
+            if self._eof_reached():
                 return part_data
 
             next_part = self._next_part()
@@ -189,19 +183,28 @@ class CuckooFile(FileLikeBase):
             return part_data
 
     def _read(self, sizehint=-1):
+        if sizehint > self.max_part_size:
+            raise NotImplementedError("Cannot read chunks bigger than a single part yet")
+
+        if self._eof_reached():
+            return None
+
         if sizehint > 0:
             return self._readbuffered(sizehint)
         else:
             return self._readall()
 
     def _seek(self, offset, whence):
-        if offset > 0 and whence > 1:
+        if whence > 1:
             raise NotImplementedError("Only seeking to start is implemented yet.")
 
         for part in self._parts:
             part.seek(offset)
 
         self._fpointer = offset
+
+    def _tell(self):
+        return self._fpointer
 
     def close(self):
         for part in self._parts:
