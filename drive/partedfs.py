@@ -6,14 +6,29 @@ from fs.wrapfs import WrapFS
 
 class PartedFS(WrapFS):
     """A virtual filesystem that splits large files into many smaller files."""
-
     def __init__(self, fs, max_part_size):
+        """
+        Create a PartedFS with an underlying real filesystem.
+        :param fs: The underlying filesystem where the many small files will be stored
+        :param max_part_size: The max size one part of a file can reach.
+        """
         self.max_part_size = max_part_size
         super(PartedFS, self).__init__(fs)
 
 
 class FilePart(FileWrapper):
+    """
+    A part of a file (PartedFile) that can reach a maximum size and then must be extended to another part.
+    """
     def __init__(self, wrapped_file, mode, max_size, path, fs):
+        """
+        Create a new FilePart by wrapping it around an existing file.
+        :param wrapped_file: The existing file to wrap around
+        :param mode: The mode the wrapped_file was originally opened.
+        :param max_size: The max size this part can reach.
+        :param path: The real path (with the part information) of this file
+        :param fs: The filesystem that is used
+        """
         super(FilePart, self).__init__(wrapped_file, mode)
         self.max_size = max_size
         self.path = path
@@ -23,7 +38,11 @@ class FilePart(FileWrapper):
         """
         Fill the part up with the given data and return the data that could not be written.
         If all the data has been written it returns None.
+
+        This might look similar to the standard IO convention, but we can't rely always on this implementation.
+
         :param data: The data to write to the part
+        :return all data that could not be filled into this part or None if all data fit in
         """
         space_left = self.max_size - (self.tell() % self.max_size)
         if len(data) < space_left:
@@ -31,24 +50,39 @@ class FilePart(FileWrapper):
             return None
         else:
             self.write(data[0:space_left])
-            return data[space_left]
+            return data[space_left:]
 
     @property
     def size(self):
+        """
+        Returns the current size of the file . This is actually the same as:
+        not flushed write buffer + flushed file contents
+        Internally we recalculate the size on every write request.
+        """
         wbuffer = self._wbuffer if self._wbuffer else 0
         return wbuffer + self.fs.getsize(self.path)
 
 
 class InvalidFilePointerLocation(Exception):
+    """
+    An error that happens when the file pointer is in a negative offset or at a place where there
+    is no part for it
+    """
     pass
 
 
 class PartedFile(FileLikeBase):
     """
-    A PartedFile is composed out of many other smaller files (parts).
+    A PartedFile is composed out of many other smaller files (FilePart).
     """
-
     def __init__(self, path, mode, fs, max_part_size):
+        """
+        Create a PartedFile for a path.
+        :param path: Path of the virtual file
+        :param mode: Mode with which the file was opened and with thich all the parts should be opened as well
+        :param fs: Filesystem where this PartedFile exists
+        :param max_part_size: The max a part of the file can reach
+        """
         super(PartedFile, self).__init__()
         self.path = path
         self.mode = mode
@@ -66,7 +100,14 @@ class PartedFile(FileLikeBase):
     def current_part(self):
         """
         Calculates the current part by looking up in which part the file pointer must be.
-        If there are no parts it returns None
+        If there are no parts it returns None.
+
+        If you've filled a part with all possible bytes and advances the _fpointer, the current_part
+        will still be the part you've written to. To advance to the next part you should use _next_part or _expand::
+            left_over = self.current_part.fill(data)
+            self._fpointer += len(data) - len(left_over)
+            self._next_part().fill(left_over)
+
         """
         if len(self._parts) == 0:
             return None
@@ -147,6 +188,7 @@ class PartedFile(FileLikeBase):
 
     def _write(self, data, flushing=False):
         def optional_flush(flushable):
+            """Only flush if flushing has been set"""
             if flushing:
                 flushable.flush()
 
@@ -160,6 +202,8 @@ class PartedFile(FileLikeBase):
                 optional_flush(part)
                 if len(data) > 0:
                     part = self._expand_part()
+            part.fill(data)
+            optional_flush(part)
         else:
             self.current_part.write(data)
             self._fpointer += len(data)

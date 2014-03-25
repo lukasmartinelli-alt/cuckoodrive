@@ -22,7 +22,8 @@ class TestFilePart:
         fs = MemoryFS()
         mode = "wb+"
         wrapped_file = fs.open("backup.tar", mode)
-        return FilePart(wrapped_file, mode, max_size=kb(4))
+        return FilePart(wrapped_file=wrapped_file, mode=mode,
+                        max_size=kb(4), path="backup.tar", fs=fs)
 
     def test_fill_with_less_data_returns_none(self, file_part):
         #Act
