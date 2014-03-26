@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+from mock import Mock, call
 
 from pytest import fixture, raises, mark
 from fs.memoryfs import MemoryFS
 from os import urandom
-from drive.partedfs import FilePart, PartedFile, InvalidFilePointerLocation
+from drive.partedfs import FilePart, PartedFile, InvalidFilePointerLocation, PartedFS
 
 
 def kb(value):
@@ -14,6 +15,37 @@ def kb(value):
     :return: value in Bytes
     """
     return value * 1024
+
+
+class TestPartedFS:
+    @fixture
+    def fs(self):
+        wrapped_fs = MemoryFS()
+        wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
+        wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
+        wrapped_fs.setcontents("backup.tar.part2", data=urandom(kb(2)))
+        return PartedFS(wrapped_fs, kb(4))
+
+    def test_exists_returns_true_when_first_part_could_be_found(self, fs):
+        #Act & Assert
+        assert fs.exists("backup.tar")
+
+    def test_open_for_reading_returns_parted_file_with_all_parts(self, fs):
+        #Act
+        parted_file = fs.open("backup.tar", mode="r")
+        #Assert
+        assert len(parted_file._parts) == 3
+
+    def test_remove_deletes_all_parts(self, fs):
+        #Arrange
+        fs.wrapped_fs.remove = Mock()
+        #Act
+        fs.remove("backup.tar")
+        #Assert
+        fs.wrapped_fs.remove.assert_has_calls([
+            call("/backup.tar.part0"),
+            call("/backup.tar.part1"),
+            call("/backup.tar.part2")], any_order=True)
 
 
 class TestFilePart:
@@ -171,17 +203,6 @@ class TestPartedFile:
         eof = parted_file._read(sizehint=kb(2))
         #Assert
         assert eof is None
-
-    @mark.xfail
-    def test_read_after_file_has_been_reopened(self, remote_filesystems):
-        #Arrange
-        with PartedFile("cuckoo.tar", "wb", remote_filesystems, kb(4)) as parted_file:
-            parted_file._write(urandom(kb(6)))
-        #Act
-        with PartedFile("cuckoo.tar", "rb", remote_filesystems, kb(4)) as parted_file:
-            read_data = parted_file._read()
-        #Assert
-        assert len(read_data) == kb(6)
 
     def test_seek_can_go_to_start_of_file(self, parted_file):
         #Arrange

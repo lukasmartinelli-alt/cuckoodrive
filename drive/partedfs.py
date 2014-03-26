@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+from fs.errors import ResourceNotFoundError, ResourceInvalidError
 from fs.filelike import FileLikeBase, FileWrapper
+from fs.path import normpath, dirname
 from fs.wrapfs import WrapFS
 
 
@@ -14,6 +16,18 @@ class PartedFS(WrapFS):
         """
         self.max_part_size = max_part_size
         super(PartedFS, self).__init__(fs)
+
+    def open(self, path, mode='r', **kwargs):
+        path = normpath(path)
+        parts = self.wrapped_fs.listdir(path=dirname(path), wildcard="*.part*", files_only=True, absolute=True)
+        return PartedFile(path, mode, self.wrapped_fs, self.max_part_size, parts=parts)
+
+    def exists(self, path):
+        return self.wrapped_fs.exists(path + ".part0")
+
+    def remove(self, path):
+        for part in self.wrapped_fs.listdir(path=dirname(path), wildcard="*.part*", files_only=True, absolute=True):
+            self.wrapped_fs.remove(part)
 
 
 class FilePart(FileWrapper):
@@ -75,7 +89,7 @@ class PartedFile(FileLikeBase):
     """
     A PartedFile is composed out of many other smaller files (FilePart).
     """
-    def __init__(self, path, mode, fs, max_part_size):
+    def __init__(self, path, mode, fs, max_part_size, parts=None):
         """
         Create a PartedFile for a path.
         :param path: Path of the virtual file
@@ -89,8 +103,8 @@ class PartedFile(FileLikeBase):
         self.max_part_size = max_part_size
 
         self._fs = fs
-        self._parts = []
         self._fpointer = 0  # Current position of the file pointer
+        self._parts = [self._fs.open(path=part, mode=self.mode) for part in parts] if parts else []
 
     def _data_too_big(self, data):
         """Returns True if there is any data and it is longer than the left space in the file"""
