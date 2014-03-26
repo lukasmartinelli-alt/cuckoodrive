@@ -1,52 +1,111 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+from fs import iotools
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 from fs.filelike import FileLikeBase, FileWrapper
-from fs.path import normpath, dirname
+from fs.path import dirname, basename, splitext
 from fs.wrapfs import WrapFS
 
 
 class PartedFS(WrapFS):
-    """A virtual filesystem that splits large files into many smaller files."""
+    """
+    A virtual filesystem that splits large files into many smaller files.
+    This filesystem uses an underlying filesystem to translate the many small files back and forth.
+    """
+
+    _meta = {
+        "virtual": True,
+        "read_only": False,
+        "unicode_paths": True,
+        "case_insensitive_paths": False
+    }
+
     def __init__(self, fs, max_part_size):
         """
-        Create a PartedFS with an underlying real filesystem.
+        Create a PartedFS with an underlying filesystem.
         :param fs: The underlying filesystem where the many small files will be stored
         :param max_part_size: The max size one part of a file can reach.
         """
         self.max_part_size = max_part_size
         super(PartedFS, self).__init__(fs)
 
-    def open(self, path, mode='r', **kwargs):
-        path = normpath(path)
-        parts = self.wrapped_fs.listdir(path=dirname(path), wildcard="*.part*", files_only=True, absolute=True)
-        return PartedFile(path, mode, self.wrapped_fs, self.max_part_size, parts=parts)
+    def listparts(self, path, full=False, absolute=False):
+        """
+        Return all parts for a given path.
+        :param path: Path to check for parts
+        :returns list of paths of parts
+        """
+        return self.wrapped_fs.listdir(path=dirname(path), wildcard="{0}.part*".format(basename(path)),
+                                       full=full, absolute=absolute, files_only=True)
 
-    def exists(self, path):
-        return self.wrapped_fs.exists(path + ".part0")
+    @iotools.filelike_to_stream
+    def open(self, path, mode='r', **kwargs):
+        print("OPEN")
+        print(mode)
+        def open_part(part_path):
+                    return self.wrapped_fs.open(part_path, mode, **kwargs)
+
+        if not "+" in mode and "r" in mode:
+            if not self.exists(path):
+                raise ResourceNotFoundError(path)
+            if self.isdir(path):
+                raise ResourceInvalidError(path)
+            else:
+                parts = [FilePart(open_part(part), mode, self.max_part_size) for part in self.listparts(path)]
+                return PartedFile(path, mode, self.wrapped_fs, self.max_part_size, parts)
+        print("Returning it")
+        return PartedFile(path, mode, self.wrapped_fs, self.max_part_size)
 
     def remove(self, path):
-        for part in self.wrapped_fs.listdir(path=dirname(path), wildcard="*.part*", files_only=True, absolute=True):
+        """
+        Remove a virtual file with path from the filesystem. This will delete all associated paths.
+        """
+        for part in self.listparts(path):
             self.wrapped_fs.remove(part)
+
+    def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False, files_only=False):
+        """
+        Lists the file and directories under a given path. This will return all .part0 files in the underlying fs
+        as files and the other normal dirs as dirs.
+        """
+        print("LISTDIR")
+        dirs = self.wrapped_fs.listdir(path=path, dirs_only=True, wildcard=wildcard, full=full, absolute=absolute)
+        files = self.wrapped_fs.listdir(path=path, files_only=True, wildcard="*.part0", full=full, absolute=absolute)
+        files = [splitext(f)[0] for f in files]
+        if dirs_only:
+            return dirs
+        if files_only:
+            return files
+        return dirs + files
+
+    def exists(self, path):
+        """Check wether a path exists. Please use the virtual file names (without .part)"""
+        return self.wrapped_fs.exists(path) or self.wrapped_fs.exists("{0}.part0".format(path))
+
+    def isfile(self, path):
+        return self.wrapped_fs.isfile("{0}.part0".format(path))
+
+
+class PartSizeExceeded(Exception):
+    pass
 
 
 class FilePart(FileWrapper):
     """
     A part of a file (PartedFile) that can reach a maximum size and then must be extended to another part.
     """
-    def __init__(self, wrapped_file, mode, max_size, path, fs):
+
+    def __init__(self, wrapped_file, mode, max_size):
         """
         Create a new FilePart by wrapping it around an existing file.
         :param wrapped_file: The existing file to wrap around
         :param mode: The mode the wrapped_file was originally opened.
         :param max_size: The max size this part can reach.
-        :param path: The real path (with the part information) of this file
-        :param fs: The filesystem that is used
         """
         super(FilePart, self).__init__(wrapped_file, mode)
         self.max_size = max_size
-        self.path = path
-        self.fs = fs
+        self.size = 0
+        self._file_pointer = 0
 
     def fill(self, data):
         """
@@ -66,15 +125,18 @@ class FilePart(FileWrapper):
             self.write(data[0:space_left])
             return data[space_left:]
 
-    @property
-    def size(self):
-        """
-        Returns the current size of the file . This is actually the same as:
-        not flushed write buffer + flushed file contents
-        Internally we recalculate the size on every write request.
-        """
-        wbuffer = self._wbuffer if self._wbuffer else 0
-        return wbuffer + self.fs.getsize(self.path)
+    def _write(self, data, flushing=False):
+        self._file_pointer += len(data)
+        if self._file_pointer > self.size:
+            self.size = self._file_pointer
+        if self.size > self.max_size:
+            raise PartSizeExceeded("Part cannot grow bigger than {0}.".format(self.max_size))
+
+        self.wrapped_file.write(data)
+
+    def _seek(self, offset, whence):
+        self._file_pointer = offset
+        self.wrapped_file.seek(offset, whence)
 
 
 class InvalidFilePointerLocation(Exception):
@@ -89,22 +151,24 @@ class PartedFile(FileLikeBase):
     """
     A PartedFile is composed out of many other smaller files (FilePart).
     """
+
     def __init__(self, path, mode, fs, max_part_size, parts=None):
         """
         Create a PartedFile for a path.
+        :param parts: File handles to the associated parts
         :param path: Path of the virtual file
-        :param mode: Mode with which the file was opened and with thich all the parts should be opened as well
+        :param mode: Mode with which the file was opened and with thich all the part_paths should be opened as well
         :param fs: Filesystem where this PartedFile exists
         :param max_part_size: The max a part of the file can reach
         """
         super(PartedFile, self).__init__()
-        self.path = path
-        self.mode = mode
         self.max_part_size = max_part_size
 
+        self._path = path
+        self._mode = mode
         self._fs = fs
         self._fpointer = 0  # Current position of the file pointer
-        self._parts = [self._fs.open(path=part, mode=self.mode) for part in parts] if parts else []
+        self._parts = parts if parts else []
 
     def _data_too_big(self, data):
         """Returns True if there is any data and it is longer than the left space in the file"""
@@ -117,11 +181,7 @@ class PartedFile(FileLikeBase):
         If there are no parts it returns None.
 
         If you've filled a part with all possible bytes and advances the _fpointer, the current_part
-        will still be the part you've written to. To advance to the next part you should use _next_part or _expand::
-            left_over = self.current_part.fill(data)
-            self._fpointer += len(data) - len(left_over)
-            self._next_part().fill(left_over)
-
+        will still be the part you've written to. To advance to the next part you should use _next_part or _expand
         """
         if len(self._parts) == 0:
             return None
@@ -147,9 +207,9 @@ class PartedFile(FileLikeBase):
 
     def _expand_part(self):
         """Expand the current_part to a new file and return it."""
-        path = self.path + ".part{0}".format(len(self._parts))
-        wrapped_part = self._fs.open(path, mode=self.mode)
-        new_part = FilePart(wrapped_part, self.mode, self.max_part_size, path, self._fs)
+        path = self._path + ".part{0}".format(len(self._parts))
+        wrapped_part = self._fs.open(path, mode=self._mode)
+        new_part = FilePart(wrapped_part, self._mode, self.max_part_size)
         self._parts.append(new_part)
         return new_part
 
@@ -171,10 +231,11 @@ class PartedFile(FileLikeBase):
             part_data = self.current_part.read(self.current_part.size - read_space)
             self._fpointer += len(part_data)
 
-            if self._eof_reached():
+            next_part = self._next_part()
+
+            if not next_part:
                 return part_data
 
-            next_part = self._next_part()
             next_part.seek(offset=0, whence=0)
             next_part_data = next_part.read(sizehint - len(part_data))
             self._fpointer += len(next_part_data)
@@ -184,21 +245,22 @@ class PartedFile(FileLikeBase):
             self._fpointer += len(part_data)
             return part_data
 
-
     # --------------------------------------------------------------------
     # Essential Methods that are expected by the FileLikeBase
     # to be implemented and should behave as defined
     # --------------------------------------------------------------------
-
     def _read(self, sizehint=-1):
         if sizehint > self.max_part_size:
             raise NotImplementedError("Cannot read chunks bigger than a single part yet")
-        if self._eof_reached():
-            return None
         if sizehint > 0:
-            return self._readbuffered(sizehint)
+            data = self._readbuffered(sizehint)
         else:
-            return self._readall()
+            data = self._readall()
+
+        if len(data) > 0:
+            return data
+        else:
+            return None
 
     def _write(self, data, flushing=False):
         def optional_flush(flushable):
@@ -239,6 +301,6 @@ class PartedFile(FileLikeBase):
     # Altered behaviour of the FileLikeBase
     # --------------------------------------------------------------------
     def close(self):
+        super(PartedFile, self).close()
         for part in self._parts:
             part.close()
-        super(PartedFile, self).close()

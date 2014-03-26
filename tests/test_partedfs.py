@@ -6,6 +6,7 @@ from pytest import fixture, raises, mark
 from fs.memoryfs import MemoryFS
 from os import urandom
 from drive.partedfs import FilePart, PartedFile, InvalidFilePointerLocation, PartedFS
+from tests.test_fs import FSTestBase
 
 
 def kb(value):
@@ -17,20 +18,34 @@ def kb(value):
     return value * 1024
 
 
-class TestPartedFS:
+class TestPartedFS(FSTestBase):
     @fixture
-    def fs(self):
-        wrapped_fs = MemoryFS()
-        wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
-        wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
-        wrapped_fs.setcontents("backup.tar.part2", data=urandom(kb(2)))
-        return PartedFS(wrapped_fs, kb(4))
+    def fs(self, **kwargs):
+        return PartedFS(MemoryFS(), kb(4))
+
+    def test_open_existing_file_and_read_from_it(self, fs):
+        #Arrange
+        path = "new_file"
+        data = "Lorem ipsum"
+        with fs.open(path, "wb") as f:
+            f.write(data)
+        #Act
+        with fs.open(path, "rb") as f:
+            written_data = f.read()
+        #Assert
+        assert data == written_data
 
     def test_exists_returns_true_when_first_part_could_be_found(self, fs):
+        #Arrange
+        fs.wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
         #Act & Assert
         assert fs.exists("backup.tar")
 
     def test_open_for_reading_returns_parted_file_with_all_parts(self, fs):
+        #Arrange
+        fs.wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part2", data=urandom(kb(2)))
         #Act
         parted_file = fs.open("backup.tar", mode="r")
         #Assert
@@ -38,14 +53,17 @@ class TestPartedFS:
 
     def test_remove_deletes_all_parts(self, fs):
         #Arrange
+        fs.wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part2", data=urandom(kb(2)))
         fs.wrapped_fs.remove = Mock()
         #Act
         fs.remove("backup.tar")
         #Assert
         fs.wrapped_fs.remove.assert_has_calls([
-            call("/backup.tar.part0"),
-            call("/backup.tar.part1"),
-            call("/backup.tar.part2")], any_order=True)
+            call("backup.tar.part0"),
+            call("backup.tar.part1"),
+            call("backup.tar.part2")], any_order=True)
 
 
 class TestFilePart:
@@ -53,9 +71,8 @@ class TestFilePart:
     def file_part(self):
         fs = MemoryFS()
         mode = "wb+"
-        wrapped_file = fs.open("backup.tar", mode)
-        return FilePart(wrapped_file=wrapped_file, mode=mode,
-                        max_size=kb(4), path="backup.tar", fs=fs)
+        return FilePart(wrapped_file=fs.open("backup.tar", mode), mode=mode,
+                        max_size=kb(4))
 
     def test_fill_with_less_data_returns_none(self, file_part):
         #Act
@@ -83,7 +100,7 @@ class TestPartedFile:
             path = "cuckoo.tar.part" + str(i)
             mode = "wb+"
             f = fs.open(path, mode)
-            cf = FilePart(f, mode, parted_file.max_part_size, path, fs)
+            cf = FilePart(f, mode, parted_file.max_part_size)
             if i == 3:
                 cf.write(urandom(kb(2)))
             else:

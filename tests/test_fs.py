@@ -20,8 +20,8 @@ class FSTestBase:
         for path in dir_paths:
             fs.makedir(path)
         for path in file_paths:
-            with fs.open(path, "w") as f:
-                f.write(str(urandom(1024)))
+            with fs.open(path, "wb") as f:
+                f.write(urandom(1024))
         return dir_paths, file_paths
 
     def test_open_file_that_is_a_dir_raises_error(self, fs):
@@ -42,14 +42,14 @@ class FSTestBase:
     def test_open_existing_file_and_read_from_it(self, fs):
         #Arrange
         path = "new_file"
-        text = "Lorem ipsum"
-        with fs.open(path, "w") as f:
-            f.write(text)
+        data = "Lorem ipsum"
+        with fs.open(path, "wb") as f:
+            f.write(data)
         #Act
-        with fs.open(path, "r") as f:
-            written_text = f.read()
+        with fs.open(path, "rb") as f:
+            written_data = f.read()
         #Assert
-        assert text == written_text
+        assert data == written_data
 
     def test_open_new_file_as_binary_and_write_to_it(self, fs):
         #Arrange
@@ -60,22 +60,13 @@ class FSTestBase:
         #Assert
         assert fs.exists(path)
 
-    def test_open_new_file_as_text_and_write_to_it(self, fs):
-        #Arrange
-        path = "new_text_file"
-        #Act
-        with fs.open(path, "w") as f:
-            f.write(str(urandom(1024)))
-        #Assert
-        assert fs.exists(path)
-
     def test_listdir_lists_only_directories(self, fs, folder_structure):
         #Arrange
         dir_paths, file_paths = folder_structure
         #Act
         listing = fs.listdir("/", dirs_only=True)
         #Assert
-        assert listing == dir_paths
+        assert sorted(listing) == sorted(dir_paths)
 
     def test_listdir_lists_only_files(self, fs, folder_structure):
         #Arrange
@@ -83,7 +74,7 @@ class FSTestBase:
         #Act
         listing = fs.listdir("/", files_only=True)
         #Assert
-        assert listing == file_paths
+        assert sorted(listing) == sorted(file_paths)
 
     def test_listdir_lists_all_existing_directories(self, fs, folder_structure):
         #Arrange
@@ -91,7 +82,7 @@ class FSTestBase:
         #Act
         listing = fs.listdir("/")
         #Assert
-        assert listing == dir_paths + file_paths
+        assert sorted(listing) == sorted(dir_paths + file_paths)
 
     def test_listdir_raises_error_when_dir_does_not_exist(self, fs):
         #Arrange
