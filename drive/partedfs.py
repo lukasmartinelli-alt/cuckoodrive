@@ -41,7 +41,7 @@ class PartedFS(WrapFS):
     @iotools.filelike_to_stream
     def open(self, path, mode='r', **kwargs):
         parts = [FilePart(open_part(part), mode, self.max_part_size) for part in self.listparts(path)]
-                        
+
         return PartedFile(path, mode, self.wrapped_fs, self.max_part_size)
 
     def remove(self, path):

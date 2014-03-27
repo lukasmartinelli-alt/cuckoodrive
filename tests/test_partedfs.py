@@ -7,7 +7,6 @@ from fs.memoryfs import MemoryFS
 from os import urandom
 from drive.partedfs import FilePart, PartedFile, InvalidFilePointerLocation, PartedFS
 from drive.utils import kb
-from tests.test_fs import FSTestBase
 
 
 class TestPartedFS(FSTestBase):
