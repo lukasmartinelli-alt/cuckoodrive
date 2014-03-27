@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 from os import urandom
-from datetime import datetime, timedelta, date
-from fs.path import pathcombine
+from datetime import timedelta, date
 
 from mock import Mock, call
 from pytest import fixture, raises, mark
@@ -10,7 +9,7 @@ from pytest import fixture, raises, mark
 from fs.memoryfs import MemoryFS
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 
-from drive.partedfs import PartedFS
+from drive.partedfs import PartedFS, PartedFile, FilePart, InvalidFilePointerLocation
 from drive.utils import kb
 
 
@@ -168,8 +167,9 @@ class TestPartedFS(object):
         fs_with_test_file.rename("backup.tar", "backup2.tar")
         #Assert
         fs_with_test_file.wrapped_fs.rename.assert_has_calls([
-                                                  call("backup.tar.part0", "backup2.tar.part0"),
-                                                  call("backup.tar.part1", "backup2.tar.part1")], any_order=True)
+                                                                 call("backup.tar.part0", "backup2.tar.part0"),
+                                                                 call("backup.tar.part1", "backup2.tar.part1")],
+                                                             any_order=True)
 
     def test_getsize_returns_sum_of_parts(self, fs_with_test_file):
         #Act
@@ -234,6 +234,66 @@ class TestPartedFS(object):
         fs_with_test_file.copy("backup.tar", "copy_folder/backup.tar")
         #Assert
         fs_with_test_file.wrapped_fs.copy.assert_has_calls([
-                                                  call("backup.tar.part0", "copy_folder/backup.tar.part0"),
-                                                  call("backup.tar.part1", "copy_folder/backup.tar.part1")], any_order=True)
+                                                               call("backup.tar.part0", "copy_folder/backup.tar.part0"),
+                                                               call("backup.tar.part1",
+                                                                    "copy_folder/backup.tar.part1")], any_order=True)
 
+
+class TestPartedFile(object):
+    @fixture
+    def parted_file(self):
+        fs = MemoryFS()
+        mode = "wb+"
+        path = "cuckoo.tar"
+        parts = [FilePart(fs.open("cuckoo.tar.part0", mode)), FilePart(fs.open("cuckoo.tar.part1", mode))]
+        return PartedFile(path=path, mode=mode, fs=fs, max_part_size=kb(4), parts=parts)
+
+    def test_current_part_returns_first_part_when_file_pointer_is_zero(self, parted_file):
+        #Arrange
+        parted_file._file_pointer = 0
+        #Act & Assert
+        assert parted_file.current_part == parted_file.parts[0]
+
+    def test_current_part_returns_last_part_when_file_pointer_is_max_part_size(self, parted_file):
+        #Arrange
+        parted_file._file_pointer = kb(4)
+        #Act & Assert
+        assert parted_file.current_part == parted_file.parts[1]
+
+    def test_current_part_raises_error_when_file_pointer_is_bigger_than_parts(self, parted_file):
+        #Arrange
+        parted_file._mode = "r"
+        parted_file._file_pointer = 4 * kb(4)
+        #Act & Assert
+        with raises(InvalidFilePointerLocation):
+            _ = parted_file.current_part
+
+    def test_write_returns_none_if_all_data_could_be_written(self, parted_file):
+        #Act
+        unwritten_data = parted_file._write(urandom(kb(4)))
+        #Assert
+        assert unwritten_data is None
+
+    def test_write_returns_data_that_is_bigger_than_max_part_size(self, parted_file):
+        #Act
+        unwritten_data = parted_file._write(urandom(kb(5)))
+        #Assert
+        assert len(unwritten_data) == kb(1)
+
+    def test_write_with_flushing_mode_calls_itself_until_all_data_is_written(self, parted_file):
+        #Act
+        unwritten_data = parted_file._write(urandom(kb(5)), flushing=True)
+        #Assert
+        assert unwritten_data is None
+
+    def test_write_sets_file_pointer_to_next_free_position(self, parted_file):
+        #Act
+        parted_file._write(urandom(kb(4)))
+        #Assert
+        assert parted_file._file_pointer == kb(4)
+
+    def test_write_big_amount_expands_to_parts(self, parted_file):
+        #Act
+        parted_file._write(urandom(kb(12)), flushing=True)
+        #Assert
+        assert len(parted_file.parts) == 3

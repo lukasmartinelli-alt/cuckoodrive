@@ -112,6 +112,7 @@ class PartedFS(WrapFS):
         """
         Open a new PartedFile. We will always set at least the file for part0.
         """
+
         def create_file_part(part_path):
             f = self.wrapped_fs.open(part_path, mode, **kwargs)
             return FilePart(f)
@@ -122,13 +123,15 @@ class PartedFS(WrapFS):
         if "w" not in mode and "a" not in mode:
             if self.exists(path):
                 parts = [create_file_part(p) for p in self.listparts(path)]
-                return PartedFile(parts=parts)
+                return PartedFile(fs=self.wrapped_fs, path=path, mode=mode,
+                                  max_part_size=self.max_part_size, parts=parts)
             else:
                 raise ResourceNotFoundError(path)
         if "w" in mode and self.exists(path):
             self.remove(path)
 
-        return PartedFile(parts=[create_file_part(self._encode(path))])
+        return PartedFile(fs=self.wrapped_fs, path=path, mode=mode,
+                          max_part_size=self.max_part_size, parts=[create_file_part(self._encode(path))])
 
     def rename(self, src, dst):
         """
@@ -184,11 +187,77 @@ class PartSizeExceeded(Exception):
     pass
 
 
-class PartedFile(object):
-    def __init__(self, parts):
+class InvalidFilePointerLocation(Exception):
+    pass
+
+
+class PartedFile(FileLikeBase):
+    """
+    A PartedFile is composed out of many other smaller files (FilePart).
+    A PartedFile has a current_part attribute, where the current part is calculated based on the
+    internal file pointer.
+    The FileLikeBase implements alot of functionality that allows us to keep this class lightweight.
+    The _write method for example, just tries to write the data, that can fit into the current part,
+    the rest is returned. The FileLikeBase will buffer that by itself and look that this will be written again.
+    """
+
+    def __init__(self, fs, path, mode, parts, max_part_size):
+        super(PartedFile, self).__init__()
+        self._path = path
+        self._fs = fs
+        self._file_pointer = 0
+        self._mode = mode
+
         self.parts = parts
+        self.max_part_size = max_part_size
+
+    @property
+    def current_part(self):
+        """
+        Calculates the current part by looking up in which part the file pointer must be.
+        If there are no parts it returns None.
+        """
+        size = 0
+        for part in self.parts:
+            size += self.max_part_size
+            if size > self._file_pointer:
+                return part
+
+        if self._mode == "r":
+            raise InvalidFilePointerLocation("File pointer points to a location that is not part of the file.")
+        else:
+            return self._expand_part()
+
+    def _expand_part(self):
+        """
+        Expand the current_part to a new file and return it.
+        TODO: this logic should perhaps go into the filesystem not the file
+        """
+        path = self._path + ".part{0}".format(len(self.parts))
+        wrapped_part = self._fs.open(path, mode=self._mode)
+        new_part = FilePart(wrapped_part)
+        self.parts.append(new_part)
+        return new_part
+
+    @property
+    def _space_left(self):
+        return self.max_part_size - (self._file_pointer % self.max_part_size)
+
+    def _write(self, data, flushing=False):
+        if data and len(data) > self._space_left:
+            self.current_part.write(data[:self._space_left])
+            unwritten_data = data[self._space_left:]
+            self._file_pointer += len(data) - len(unwritten_data)
+            return unwritten_data if not flushing else self._write(unwritten_data, flushing)
+        else:
+            self.current_part.write(data)
+            self._file_pointer += len(data)
 
 
-class FilePart(object):
-    def __init__(self, obj):
-        pass
+class FilePart(FileWrapper):
+    """
+    A part of a file (PartedFile) that can reach a maximum size and then must be extended to another part.
+    """
+
+    def __init__(self, wrapped_file):
+        super(FilePart, self).__init__(wrapped_file)
