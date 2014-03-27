@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 from os import urandom
+from fs.errors import ResourceNotFoundError, ResourceInvalidError
 
 from mock import Mock, call
 
@@ -100,3 +101,53 @@ class TestPartedFS(object):
         listing = fs_with_folder_structure.listdir()
         #Assert
         assert listing == ["older_backups", "README.txt", "backup.tar"]
+
+    def test_open_if_w_in_mode_all_parts_should_be_removed(self, fs):
+        #Arrange
+        path = "backup.tar"
+        fs.wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
+        fs.remove = Mock()
+        #Act
+        fs.open(path, mode="w")
+        #Assert
+        fs.remove.assert_called_once_with("backup.tar")
+
+    def test_open_raises_error_if_w_and_a_not_in_mode(self, fs):
+        #Act & Assert
+        with raises(ResourceNotFoundError):
+            fs.open("i_dont_exist", mode="r")
+
+    def test_open_raises_error_if_path_is_directory(self, fs):
+        #Arrange
+        fs.makedir("backups")
+        #Act & Assert
+        with raises(ResourceInvalidError):
+            fs.open("backups", mode="w")
+
+    def test_open_raises_error_if_path_does_not_exist(self, fs):
+        #Arrange
+        path = "backup.tar"
+        #Act & Assert
+        with raises(ResourceNotFoundError):
+            fs.open(path, mode="r")
+        with raises(ResourceNotFoundError):
+            fs.open(path, mode="r+")
+
+    def test_open_creates_empty_file_if_path_does_not_exist(self, fs):
+        #Arrange
+        path = "backup.tar"
+        #Act
+        f = fs.open(path, mode="w")
+        #Assert
+        assert len(f.parts) == 1
+
+    def test_open_uses_existing_parts_if_path_exists(self, fs):
+        #Arrange
+        path = "backup.tar"
+        fs.wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
+        #Act
+        f = fs.open(path, mode="r+")
+        #Assert
+        assert len(f.parts) == 2

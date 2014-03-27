@@ -7,9 +7,6 @@ from fs.path import dirname, basename, splitext
 from fs.wrapfs import WrapFS, wrap_fs_methods
 
 
-
-
-
 class PartedFS(WrapFS):
     """
     A virtual filesystem that splits large files into many smaller files.
@@ -110,10 +107,36 @@ class PartedFS(WrapFS):
         """
         return self.wrapped_fs.isfile(self._encode(path))
 
+    def open(self, path, mode='r', **kwargs):
+
+        def create_file_part(part_path):
+            f = self.wrapped_fs.open(part_path, mode, **kwargs)
+            return FilePart(f)
+
+        if self.isdir(path):
+            raise ResourceInvalidError(path)
+
+        if "w" not in mode and "a" not in mode:
+            if self.exists(path):
+                parts = [create_file_part(p) for p in self.listparts(path)]
+                return PartedFile(parts=parts)
+            else:
+                raise ResourceNotFoundError(path)
+        if "w" in mode and self.exists(path):
+            self.remove(path)
+
+        return PartedFile(parts=[create_file_part(self._encode(path))])
+
 
 class PartSizeExceeded(Exception):
     pass
 
 
+class PartedFile(object):
+    def __init__(self, parts):
+        self.parts = parts
+
+
 class FilePart(object):
-    pass
+    def __init__(self, obj):
+        pass
