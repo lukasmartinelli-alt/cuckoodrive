@@ -4,7 +4,7 @@ from fs import iotools
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 from fs.filelike import FileLikeBase, FileWrapper
 from fs.path import dirname, basename, splitext
-from fs.wrapfs import WrapFS
+from fs.wrapfs import WrapFS, wrap_fs_methods
 
 
 class PartedFS(WrapFS):
@@ -40,20 +40,8 @@ class PartedFS(WrapFS):
 
     @iotools.filelike_to_stream
     def open(self, path, mode='r', **kwargs):
-        print("OPEN")
-        print(mode)
-        def open_part(part_path):
-                    return self.wrapped_fs.open(part_path, mode, **kwargs)
-
-        if not "+" in mode and "r" in mode:
-            if not self.exists(path):
-                raise ResourceNotFoundError(path)
-            if self.isdir(path):
-                raise ResourceInvalidError(path)
-            else:
-                parts = [FilePart(open_part(part), mode, self.max_part_size) for part in self.listparts(path)]
-                return PartedFile(path, mode, self.wrapped_fs, self.max_part_size, parts)
-        print("Returning it")
+        parts = [FilePart(open_part(part), mode, self.max_part_size) for part in self.listparts(path)]
+                        
         return PartedFile(path, mode, self.wrapped_fs, self.max_part_size)
 
     def remove(self, path):

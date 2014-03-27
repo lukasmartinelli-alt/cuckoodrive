@@ -100,14 +100,6 @@ class FSTestBase:
         #Assert
         assert result
 
-    def test_isfile_returns_true_if_isdir_is_false(self, fs):
-        #Arrange
-        fs.isdir = lambda path: False
-        #Act
-        result = fs.isfile("file.txt")
-        #Assert
-        assert result
-
     def test_makedir_creates_directory(self, fs):
         #Arrange
         path = "testdir"

@@ -6,16 +6,8 @@ from pytest import fixture, raises, mark
 from fs.memoryfs import MemoryFS
 from os import urandom
 from drive.partedfs import FilePart, PartedFile, InvalidFilePointerLocation, PartedFS
+from drive.utils import kb
 from tests.test_fs import FSTestBase
-
-
-def kb(value):
-    """
-    Helper method to return value in KB as value in Bytes
-    :param value in Kilobytes
-    :return: value in Bytes
-    """
-    return value * 1024
 
 
 class TestPartedFS(FSTestBase):
@@ -23,17 +15,15 @@ class TestPartedFS(FSTestBase):
     def fs(self, **kwargs):
         return PartedFS(MemoryFS(), kb(4))
 
-    def test_open_existing_file_and_read_from_it(self, fs):
+    def test_listparts_returns_all_parts_for_a_path(self, fs):
         #Arrange
-        path = "new_file"
-        data = "Lorem ipsum"
-        with fs.open(path, "wb") as f:
-            f.write(data)
+        path = "backup.tar"
+        fs.wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
         #Act
-        with fs.open(path, "rb") as f:
-            written_data = f.read()
+        listing = fs.listparts(path)
         #Assert
-        assert data == written_data
+        assert listing == ["backup.tar.part0", "backup.tar.part1"]
 
     def test_exists_returns_true_when_first_part_could_be_found(self, fs):
         #Arrange
@@ -41,15 +31,27 @@ class TestPartedFS(FSTestBase):
         #Act & Assert
         assert fs.exists("backup.tar")
 
-    def test_open_for_reading_returns_parted_file_with_all_parts(self, fs):
+    def test_isfile_returns_wether_the_first_part_is_file(self, fs):
+        #Arrange
+        fs.wrapped_fs.isfile = Mock()
+        #Act
+        fs.isfile("backup.tar")
+        #Act
+        fs.wrapped_fs.isfile.assert_called_once_with("backup.tar.part0")
+
+    def test_exists_returns_false_when_first_part_is_not_found(self, fs):
+        #Act & Assert
+        assert not fs.exists("backup.tar")
+
+    def test_open_for_existing_file_returns_all_parts(self, fs):
         #Arrange
         fs.wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
         fs.wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
         fs.wrapped_fs.setcontents("backup.tar.part2", data=urandom(kb(2)))
         #Act
-        parted_file = fs.open("backup.tar", mode="r")
+        f = fs.open("backup.tar", mode="r")
         #Assert
-        assert len(parted_file._parts) == 3
+        assert len(f._parts) == 3
 
     def test_remove_deletes_all_parts(self, fs):
         #Arrange
