@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+import stat
 from fs import iotools
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 from fs.filelike import FileLikeBase, FileWrapper
@@ -46,13 +47,13 @@ class PartedFS(WrapFS):
         self.max_part_size = max_part_size
         super(PartedFS, self).__init__(fs)
 
-    def _encode(self, path):
+    def _encode(self, path, part_index=0):
         """
         Add the .part0 extension to the given path
         :param path: The plain path to encode
         :returns Encoded path (without .part extension)
         """
-        return "{0}.part0".format(path)
+        return "{0}.part{1}".format(path, part_index)
 
     def _decode(self, path):
         """
@@ -108,7 +109,9 @@ class PartedFS(WrapFS):
         return self.wrapped_fs.isfile(self._encode(path))
 
     def open(self, path, mode='r', **kwargs):
-
+        """
+        Open a new PartedFile. We will always set at least the file for part0.
+        """
         def create_file_part(part_path):
             f = self.wrapped_fs.open(part_path, mode, **kwargs)
             return FilePart(f)
@@ -126,6 +129,55 @@ class PartedFS(WrapFS):
             self.remove(path)
 
         return PartedFile(parts=[create_file_part(self._encode(path))])
+
+    def rename(self, src, dst):
+        """
+        Rename all parts accordingly.
+        """
+        if not self.exists(src):
+            raise ResourceNotFoundError(src)
+        for idx, part in enumerate(sorted(self.listparts(src))):
+            part_src = self._encode(self._decode(part), part_index=idx)
+            part_dst = self._encode(dst, part_index=idx)
+            self.wrapped_fs.rename(part_src, part_dst)
+
+    def getinfo(self, path):
+        """
+        Assemble the info of all the parts and use the most recent updated
+        timestamps of the parts as values of the file.
+        """
+        if not self.exists(path):
+            raise ResourceNotFoundError(path)
+
+        part_infos = [self.wrapped_fs.getinfo(part) for part in self.listparts(path)]
+        info = {
+            "parts": part_infos,
+            "size": self.getsize(path),
+            "created_time": max([i["modified_time"] for i in part_infos]),
+            "modified_time": max([i["modified_time"] for i in part_infos]),
+            "accessed_time": max([i["accessed_time"] for i in part_infos])
+        }
+
+        return info
+
+    def copy(self, src, dst, **kwds):
+        """
+        Copies a file from src to dst. This will copy al the parts of one file
+        to the respective location of the new file
+        """
+        if not self.exists(src):
+            raise ResourceNotFoundError(src)
+        for idx, part_src in enumerate(sorted(self.listparts(src))):
+            part_dst = self._encode(dst, idx)
+            self.wrapped_fs.copy(part_src, part_dst, **kwds)
+
+    def getsize(self, path):
+        """
+        Calculates the sum of all parts as filesize
+        """
+        if not self.exists(path):
+            raise ResourceNotFoundError(path)
+        return sum([self.wrapped_fs.getsize(part) for part in self.listparts(path)])
 
 
 class PartSizeExceeded(Exception):
