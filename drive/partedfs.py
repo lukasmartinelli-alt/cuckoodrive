@@ -69,7 +69,8 @@ class PartedFS(WrapFS):
         :param path: Path to check for parts
         :returns list of paths of parts
         """
-        return self.wrapped_fs.listdir(path=dirname(path), wildcard="{0}.part*".format(basename(path)),
+        return self.wrapped_fs.listdir(path=dirname(path),
+                                       wildcard="{0}.part*".format(basename(path)),
                                        full=full, absolute=absolute, files_only=True)
 
     def remove(self, path):
@@ -80,13 +81,16 @@ class PartedFS(WrapFS):
         for part in self.listparts(path):
             self.wrapped_fs.remove(part)
 
-    def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False, files_only=False):
+    def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False,
+                files_only=False):
         """
         Lists the file and directories under a given path. This will return all .part0 files in the underlying fs
         as files and the other normal dirs as dirs.
         """
-        dirs = self.wrapped_fs.listdir(path=path, dirs_only=True, wildcard=wildcard, full=full, absolute=absolute)
-        files = self.wrapped_fs.listdir(path=path, files_only=True, wildcard="*.part0", full=full, absolute=absolute)
+        dirs = self.wrapped_fs.listdir(path=path, dirs_only=True, wildcard=wildcard, full=full,
+                                       absolute=absolute)
+        files = self.wrapped_fs.listdir(path=path, files_only=True, wildcard="*.part0", full=full,
+                                        absolute=absolute)
         files = [self._decode(f) for f in files]
         if dirs_only:
             return dirs
@@ -131,7 +135,8 @@ class PartedFS(WrapFS):
             self.remove(path)
 
         return PartedFile(fs=self.wrapped_fs, path=path, mode=mode,
-                          max_part_size=self.max_part_size, parts=[create_file_part(self._encode(path))])
+                          max_part_size=self.max_part_size,
+                          parts=[create_file_part(self._encode(path))])
 
     def rename(self, src, dst):
         """
@@ -224,7 +229,8 @@ class PartedFile(FileLikeBase):
                 return part
 
         if self._mode == "r":
-            raise InvalidFilePointerLocation("File pointer points to a location that is not part of the file.")
+            raise InvalidFilePointerLocation(
+                "File pointer points to a location that is not part of the file.")
         else:
             return self._expand_part()
 
@@ -253,11 +259,40 @@ class PartedFile(FileLikeBase):
             self.current_part.write(data)
             self._file_pointer += len(data)
 
+    def _seek(self, offset, whence):
+        if whence == 0:
+            self._file_pointer = offset
+        if whence == 1:
+            self._file_pointer += offset
+        if whence == 2:
+            raise NotImplementedError("Seeking from end is not implemented")
+
+        for part in self.parts:
+            if part == self.current_part:
+                part.seek(offset % self.max_part_size, 0)
+            else:
+                part.seek(0, 0)
+
+    def _tell(self):
+        return self._file_pointer
+
+    def _read(self, sizehint=-1):
+        part = self.current_part
+        read_data = part.read()
+        self._file_pointer += len(read_data)
+
+        if len(read_data) == 0:
+            return None
+
+        if sizehint > 0:
+            return read_data
+        else:
+            return read_data if self.parts[-1] == part else read_data + self._read()
+
 
 class FilePart(FileWrapper):
     """
     A part of a file (PartedFile) that can reach a maximum size and then must be extended to another part.
     """
-
     def __init__(self, wrapped_file):
         super(FilePart, self).__init__(wrapped_file)

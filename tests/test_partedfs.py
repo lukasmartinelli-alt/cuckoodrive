@@ -297,3 +297,94 @@ class TestPartedFile(object):
         parted_file._write(urandom(kb(12)), flushing=True)
         #Assert
         assert len(parted_file.parts) == 3
+
+    def test_seek_absolute_should_set_filepointer_to_offset(self, parted_file):
+        #Arrange
+        parted_file._file_pointer = kb(1)
+        #Act
+        parted_file._seek(offset=kb(0), whence=0)
+        #Assert
+        assert parted_file._file_pointer == kb(0)
+
+    def test_seek_goes_to_current_part_and_sets_other_parts_to_start(self, parted_file):
+        #Arrange
+        parted_file.parts[0].seek = Mock()
+        parted_file.parts[1].seek = Mock()
+        #Act
+        parted_file._seek(offset=kb(5), whence=0)
+        #Assert
+        parted_file.parts[0].seek.assert_called_once_with(kb(0), 0)
+        parted_file.parts[1].seek.assert_called_once_with(kb(1), 0)
+
+
+    def test_seek_relative_should_add_ofset_to_filepointer(self, parted_file):
+        #Arrange
+        parted_file._file_pointer = kb(1)
+        #Act
+        parted_file._seek(offset=kb(1), whence=1)
+        #Assert
+        assert parted_file._file_pointer == kb(2)
+
+    @mark.xfail
+    def test_seek_relative_to_end_should_set_filepointer_to_last_part(self, parted_file):
+        #Act
+        parted_file._seek(offset=-kb(4), whence=2)
+        #Assert
+        assert parted_file._file_pointer == kb(4)
+
+    def test_tell_returns_file_pointer(self, parted_file):
+        #Arrange
+        parted_file._file_pointer = kb(2)
+        #Act
+        pos = parted_file._tell()
+        #Assert
+        assert pos == kb(2)
+
+    def test_read_returns_data_from_current_part_and_calls_itself_for_next_part(self, parted_file):
+        #Arrange
+        parted_file._write(urandom(kb(5)), flushing=True)
+        parted_file._seek(offset=kb(3), whence=0)
+        #Act
+        read_data = parted_file._read()
+        #Assert
+        assert len(read_data) == kb(2)
+
+    def test_read_returns_data_from_current_part_in_chunks(self, parted_file):
+        #Arrange
+        parted_file._write(urandom(kb(5)), flushing=True)
+        parted_file._seek(offset=kb(3), whence=0)
+        #Act
+        chunk1 = parted_file._read(kb(1))
+        chunk2 = parted_file._read(kb(1))
+        #Assert
+        assert len(chunk1) == kb(1)
+        assert len(chunk2) == kb(1)
+
+    def test_read_returns_only_data_of_current_part_with_bigger_sizehint(self, parted_file):
+        #Arrange
+        parted_file._write(urandom(kb(5)), flushing=True)
+        parted_file._seek(offset=kb(3), whence=0)
+        #Act
+        chunk = parted_file._read(kb(2))
+        #Assert
+        assert len(chunk) == kb(1)
+
+    def test_read_returns_none_after_read_all(self, parted_file):
+        #Arrange
+        parted_file._write(urandom(kb(5)), flushing=True)
+        parted_file._seek(offset=0, whence=0)
+        parted_file._read()
+        #Act
+        eof = parted_file._read()
+        #Assert
+        assert eof is None
+
+    def test_read_as_chunks_returns_none_at_end_of_file(self, parted_file):
+        #Arrange
+        parted_file._write(urandom(kb(5)), flushing=True)
+        parted_file._seek(offset=kb(4), whence=0)
+        parted_file._read(kb(1))
+        #Act
+        eof = parted_file._read(kb(1))
+        #Assert
+        assert eof is None
