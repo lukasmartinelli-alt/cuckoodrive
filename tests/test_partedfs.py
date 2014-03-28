@@ -112,6 +112,21 @@ class TestPartedFS(object):
         #Assert
         assert listing == ["older_backups", "README.txt", "backup.tar"]
 
+    def test_listdirinfo_raises_error_when_not_exists(self, fs):
+        #Act & Assert
+        with raises(ResourceNotFoundError):
+            fs.listdirinfo("random_dir")
+
+    def test_listdirinfo_returns_path_and_infodict(self, fs_with_folder_structure):
+        #Arrange
+        info = {}
+        fs_with_folder_structure.getinfo = Mock(return_value=info)
+        #Act
+        listing = fs_with_folder_structure.listdirinfo()
+        #Assert
+        assert listing == [("older_backups", info), ("README.txt", info), ("backup.tar", info)]
+
+
     def test_open_if_w_in_mode_all_parts_should_be_removed(self, fs_with_test_file):
         #Arrange
         fs_with_test_file.remove = Mock()
@@ -155,6 +170,17 @@ class TestPartedFS(object):
         #Assert
         assert len(f.parts) == 2
 
+    def test_open_with_existing_parts_opens_them_in_correct_order(self, fs):
+        #Arrange
+        fs.wrapped_fs.setcontents("backup.tar.part0", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part1", data=urandom(kb(4)))
+        fs.wrapped_fs.setcontents("backup.tar.part2", data=urandom(kb(2)))
+        #Act
+        f = fs.open("backup.tar", mode="r+")
+        #Assert
+        created_parts = [part.name for part in f.parts]
+        assert created_parts == ["backup.tar.part0", "backup.tar.part1", "backup.tar.part2"]
+
     def test_rename_raises_error_if_not_exists(self, fs):
         #Act & Assert
         with raises(ResourceNotFoundError):
@@ -186,6 +212,24 @@ class TestPartedFS(object):
         #Act & Assert
         with raises(ResourceNotFoundError):
             fs.getinfo("im_invisible")
+
+    def test_geinfo_returns_directory_info_for_dir(self, fs):
+        #Arrange
+        created = date.today() + timedelta(days=10)
+        accessed = date.today() + timedelta(days=10)
+        modfied = date.today() + timedelta(days=10)
+
+        fs.makedir("dir")
+        fs.wrapped_fs.getinfo = Mock(return_value={
+            "created_time": created,
+            "modified_time": accessed,
+            "accessed_time": modfied})
+        #Act
+        info = fs.getinfo("dir")
+        #Assert
+        assert info["created_time"] == created
+        assert info["modified_time"] == accessed
+        assert info["accessed_time"] == modfied
 
     def test_getinfo_returns_latest_times(self, fs_with_test_file):
         #Arrange
@@ -388,3 +432,14 @@ class TestPartedFile(object):
         eof = parted_file._read(kb(1))
         #Assert
         assert eof is None
+
+    def test_close_calls_super_for_flush_and_closes_all_parts(self, parted_file):
+        #Arrange
+        parted_file._write(urandom(kb(4)))
+        parted_file.parts[0].close = Mock()
+        parted_file.parts[1].close = Mock()
+        #Act
+        parted_file.close()
+        #Assert
+        parted_file.parts[0].close.assert_called_with()
+        parted_file.parts[1].close.assert_called_with()

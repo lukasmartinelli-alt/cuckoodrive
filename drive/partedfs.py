@@ -84,8 +84,8 @@ class PartedFS(WrapFS):
     def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False,
                 files_only=False):
         """
-        Lists the file and directories under a given path. This will return all .part0 files in the underlying fs
-        as files and the other normal dirs as dirs.
+        Lists the file and directories under a given path. This will return all .part0 files in the
+        underlying fs as files and the other normal dirs as dirs.
         """
         dirs = self.wrapped_fs.listdir(path=path, dirs_only=True, wildcard=wildcard, full=full,
                                        absolute=absolute)
@@ -97,6 +97,16 @@ class PartedFS(WrapFS):
         if files_only:
             return files
         return dirs + files
+
+    def listdirinfo(self, path="", wildcard=None, full=False, absolute=False,
+                    dirs_only=False, files_only=False):
+        def getinfo_for_entries():
+            for entry in self.listdir(path=path, wildcard=wildcard, full=full, absolute=absolute,
+                                      dirs_only=dirs_only, files_only=files_only):
+                yield (entry, self.getinfo(entry))
+
+
+        return list(getinfo_for_entries())
 
     def exists(self, path):
         """
@@ -126,7 +136,7 @@ class PartedFS(WrapFS):
 
         if "w" not in mode and "a" not in mode:
             if self.exists(path):
-                parts = [create_file_part(p) for p in self.listparts(path)]
+                parts = [create_file_part(p) for p in sorted(self.listparts(path))]
                 return PartedFile(fs=self.wrapped_fs, path=path, mode=mode,
                                   max_part_size=self.max_part_size, parts=parts)
             else:
@@ -157,32 +167,40 @@ class PartedFS(WrapFS):
         if not self.exists(path):
             raise ResourceNotFoundError(path)
 
-        part_infos = [self.wrapped_fs.getinfo(part) for part in self.listparts(path)]
-        info = {
-            "parts": part_infos,
-            "size": self.getsize(path),
-            "created_time": max([i["modified_time"] for i in part_infos]),
-            "modified_time": max([i["modified_time"] for i in part_infos]),
-            "accessed_time": max([i["accessed_time"] for i in part_infos])
-        }
+        info = {}
+
+        if self.isdir(path):
+            info = self.wrapped_fs.getinfo(path)
+            info['st_mode'] = 0755 | stat.S_IFDIR
+        else:
+            info['st_mode'] = 0666 | stat.S_IFREG
+            part_infos = [self.wrapped_fs.getinfo(part) for part in self.listparts(path)]
+
+            if len(part_infos) > 0:
+                info["parts"] = part_infos
+                info["size"] = self.getsize(path)
+                info["created_time"] = max([i["modified_time"] for i in part_infos])
+                info["modified_time"] = max([i["modified_time"] for i in part_infos])
+                info["accessed_time"] = max([i["accessed_time"] for i in part_infos])
 
         return info
 
     def copy(self, src, dst, **kwds):
         """
-        Copies a file from src to dst. This will copy al the parts of one file
-        to the respective location of the new file
-        """
+            Copies a file from src to dst. This will copy al the parts of one file
+            to the respective location of the new file
+            """
         if not self.exists(src):
             raise ResourceNotFoundError(src)
         for idx, part_src in enumerate(sorted(self.listparts(src))):
             part_dst = self._encode(dst, idx)
             self.wrapped_fs.copy(part_src, part_dst, **kwds)
 
+
     def getsize(self, path):
         """
-        Calculates the sum of all parts as filesize
-        """
+            Calculates the sum of all parts as filesize
+            """
         if not self.exists(path):
             raise ResourceNotFoundError(path)
         return sum([self.wrapped_fs.getsize(part) for part in self.listparts(path)])
@@ -279,20 +297,34 @@ class PartedFile(FileLikeBase):
     def _read(self, sizehint=-1):
         part = self.current_part
         read_data = part.read()
-        self._file_pointer += len(read_data)
 
-        if len(read_data) == 0:
+        if len(read_data) > 0:
+            self._file_pointer += len(read_data)
+        else:
             return None
 
         if sizehint > 0:
             return read_data
         else:
-            return read_data if self.parts[-1] == part else read_data + self._read()
+            if self.parts[-1] == part:
+                return read_data
+            else:
+                remaining_data = self._read()
+                return read_data + remaining_data if remaining_data else read_data
+
+    def close(self):
+        """
+        Flushes current file and closes all parts
+        """
+        super(PartedFile, self).close()
+        for part in self.parts:
+            part.close()
 
 
 class FilePart(FileWrapper):
     """
     A part of a file (PartedFile) that can reach a maximum size and then must be extended to another part.
     """
+
     def __init__(self, wrapped_file):
         super(FilePart, self).__init__(wrapped_file)
