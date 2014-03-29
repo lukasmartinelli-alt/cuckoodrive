@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+import fnmatch
+import re
 import stat
-from fs import iotools
+
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 from fs.filelike import FileLikeBase, FileWrapper
 from fs.path import dirname, basename, splitext
@@ -93,11 +95,26 @@ class PartedFS(WrapFS):
         Lists the file and directories under a given path. This will return all .part0 files in the
         underlying fs as files and the other normal dirs as dirs.
         """
+        if self.isfile(path):
+            raise ResourceInvalidError(path)
+
         dirs = self.wrapped_fs.listdir(path=path, dirs_only=True, wildcard=wildcard, full=full,
                                        absolute=absolute)
-        files = self.wrapped_fs.listdir(path=path, files_only=True, wildcard="*.part0", full=full,
+        files = self.wrapped_fs.listdir(path=path, files_only=True, wildcard=wildcard, full=full,
                                         absolute=absolute)
-        files = [self._decode(f) for f in files]
+        files = [self._decode(f) for f in files if f.endswith(".part0")]
+
+        # I'm not particularly happy about implementing wildcard this way
+        # this should actually be called automatically in the base FS
+        # for now this is implemented here
+        if wildcard is not None:
+            if not callable(wildcard):
+                print("lol")
+                wildcard_re = re.compile(fnmatch.translate(wildcard))
+                wildcard = lambda fn: bool(wildcard_re.match(fn))
+                dirs = [p for p in dirs if wildcard(p)]
+                files = [p for p in files if wildcard(p)]
+
         if dirs_only:
             return dirs
         if files_only:
@@ -112,6 +129,9 @@ class PartedFS(WrapFS):
                 yield (entry, self.getinfo(entry))
 
         return list(getinfo_for_entries())
+
+    def removedir(self, path, *args, **kwds):
+        return self.wrapped_fs.removedir(path, *args, **kwds)
 
     def exists(self, path):
         """

@@ -9,3 +9,10 @@ def kb(value):
     :return: value in Bytes
     """
     return value * 1024
+
+
+def mb(value):
+    """
+    Helper method to return value in MB as values in Bytes
+    """
+    return kb(value) * 1025

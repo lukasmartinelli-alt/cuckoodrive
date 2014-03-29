@@ -2,15 +2,25 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 from os import urandom
 from datetime import timedelta, date
+from fs.tests import FSTestCases
 
 from mock import Mock, call
 from pytest import fixture, raises, mark
 
 from fs.memoryfs import MemoryFS
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
+import unittest
 
 from drive.partedfs import PartedFS, PartedFile, FilePart, InvalidFilePointerLocation
 from drive.utils import kb
+
+
+class TestExternalPartedFS(unittest.TestCase, FSTestCases):
+    def setUp(self):
+        self.fs = PartedFS(MemoryFS(), kb(100))
+
+    def tearDown(self):
+        self.fs.close()
 
 
 class TestPartedFS(object):
@@ -99,6 +109,17 @@ class TestPartedFS(object):
         listing = fs_with_folder_structure.listdir(dirs_only=True)
         #Assert
         assert listing == ["older_backups"]
+
+    def test_listdir_returns_only_wildcard_matches(self, fs_with_folder_structure):
+        #Act
+        listing = fs_with_folder_structure.listdir(wildcard="*backup*")
+        #Assert
+        assert listing == ["older_backups", "backup.tar"]
+
+    def test_listdir_raises_error_if_path_is_file(self, fs_with_folder_structure):
+        #Act & Assert
+        with raises(ResourceInvalidError):
+            fs_with_folder_structure.listdir("README.txt")
 
     def test_listdir_returns_only_files(self, fs_with_folder_structure):
         #Act
@@ -212,6 +233,15 @@ class TestPartedFS(object):
         #Act & Assert
         with raises(ResourceNotFoundError):
             fs.getinfo("im_invisible")
+
+    def test_removedir_calls_underlying_fs(self, fs):
+        #Arrange
+        path = "folder"
+        fs.wrapped_fs.removedir = Mock()
+        #Act
+        fs.removedir(path)
+        #Arrange
+        fs.wrapped_fs.removedir.assert_called_once_with(path)
 
     def test_isdir_calls_underyling_fs(self, fs):
         #Arrange
