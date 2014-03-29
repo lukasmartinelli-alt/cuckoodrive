@@ -213,7 +213,33 @@ class TestPartedFS(object):
         with raises(ResourceNotFoundError):
             fs.getinfo("im_invisible")
 
-    def test_geinfo_returns_directory_info_for_dir(self, fs):
+    def test_isdir_calls_underyling_fs(self, fs):
+        #Arrange
+        path = "/"
+        fs.wrapped_fs.isdir = Mock()
+        #Act
+        fs.isdir(path)
+        #Arrange
+        fs.wrapped_fs.isdir.assert_called_once_with(path)
+
+    def test_makedir_calls_underyling_fs(self, fs):
+        #Arrange
+        path = "folder"
+        fs.wrapped_fs.makedir = Mock()
+        #Act
+        fs.makedir(path)
+        #Arrange
+        fs.wrapped_fs.makedir.assert_called_once_with(path)
+
+    def test_getinfo_for_root_returns_information(self, fs):
+        #Act
+        info = fs.getinfo("/")
+        #Assert
+        assert "created_time" in info
+        assert "modified_time" in info
+        assert "accessed_time" in info
+
+    def test_getinfo_returns_directory_info_for_dir(self, fs):
         #Arrange
         created = date.today() + timedelta(days=10)
         accessed = date.today() + timedelta(days=10)

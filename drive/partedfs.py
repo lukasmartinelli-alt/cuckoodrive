@@ -81,6 +81,12 @@ class PartedFS(WrapFS):
         for part in self.listparts(path):
             self.wrapped_fs.remove(part)
 
+    def isdir(self, path):
+        return self.wrapped_fs.isdir(path)
+
+    def makedir(self, path, *args, **kwds):
+        return self.wrapped_fs.makedir(path, *args, **kwds)
+
     def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False,
                 files_only=False):
         """
@@ -104,7 +110,6 @@ class PartedFS(WrapFS):
             for entry in self.listdir(path=path, wildcard=wildcard, full=full, absolute=absolute,
                                       dirs_only=dirs_only, files_only=files_only):
                 yield (entry, self.getinfo(entry))
-
 
         return list(getinfo_for_entries())
 
@@ -167,12 +172,8 @@ class PartedFS(WrapFS):
         if not self.exists(path):
             raise ResourceNotFoundError(path)
 
-        info = {}
-
-        if self.isdir(path):
-            info = self.wrapped_fs.getinfo(path)
-            info['st_mode'] = 0755 | stat.S_IFDIR
-        else:
+        if self.isfile(path):
+            info = {}
             info['st_mode'] = 0666 | stat.S_IFREG
             part_infos = [self.wrapped_fs.getinfo(part) for part in self.listparts(path)]
 
@@ -182,6 +183,8 @@ class PartedFS(WrapFS):
                 info["created_time"] = max([i["modified_time"] for i in part_infos])
                 info["modified_time"] = max([i["modified_time"] for i in part_infos])
                 info["accessed_time"] = max([i["accessed_time"] for i in part_infos])
+        else:
+            info = self.wrapped_fs.getinfo(path)
 
         return info
 
