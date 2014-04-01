@@ -6,8 +6,8 @@ import stat
 
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 from fs.filelike import FileLikeBase, FileWrapper
-from fs.path import dirname, basename, splitext
-from fs.wrapfs import WrapFS, wrap_fs_methods
+from fs.path import dirname, basename, splitext, pathcombine, abspath
+from fs.wrapfs import WrapFS, wrap_fs_methods, rewrite_errors
 
 
 class PartedFS(WrapFS):
@@ -80,7 +80,13 @@ class PartedFS(WrapFS):
         Remove a virtual file with path from the filesystem. This will delete all associated paths.
         :param path: Raw path of where to remove all the associated paths
         """
-        for part in self.listparts(path):
+        if not self.exists(path):
+            raise ResourceNotFoundError(path)
+
+        if self.isdir(path):
+            raise ResourceInvalidError(path)
+
+        for part in self.listparts(path, absolute=True):
             self.wrapped_fs.remove(part)
 
     def isdir(self, path):
@@ -88,6 +94,9 @@ class PartedFS(WrapFS):
 
     def makedir(self, path, *args, **kwds):
         return self.wrapped_fs.makedir(path, *args, **kwds)
+
+    def movedir(self, src, dst, **kwds):
+        return self.wrapped_fs.movedir(src, dst, **kwds)
 
     def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False,
                 files_only=False):
@@ -131,6 +140,9 @@ class PartedFS(WrapFS):
         return list(getinfo_for_entries())
 
     def removedir(self, path, *args, **kwds):
+        if self.isfile(path):
+            raise ResourceInvalidError(path)
+
         return self.wrapped_fs.removedir(path, *args, **kwds)
 
     def exists(self, path):
@@ -179,10 +191,53 @@ class PartedFS(WrapFS):
         """
         if not self.exists(src):
             raise ResourceNotFoundError(src)
-        for idx, part in enumerate(sorted(self.listparts(src))):
-            part_src = self._encode(self._decode(part), part_index=idx)
-            part_dst = self._encode(dst, part_index=idx)
-            self.wrapped_fs.rename(part_src, part_dst)
+
+        if self.isdir(src):
+            self.wrapped_fs.rename(src, dst)
+        else:
+            for idx, part in enumerate(sorted(self.listparts(src, absolute=True))):
+                part_src = self._encode(self._decode(part), part_index=idx)
+                part_dst = self._encode(dst, part_index=idx)
+                self.wrapped_fs.rename(part_src, part_dst)
+
+    def walkfiles(self, path="/", wildcard=None, dir_wildcard=None, search="breadth", ignore_errors=False):
+        if dir_wildcard is not None:
+            #  If there is a dir_wildcard, fall back to the default impl
+            #  that uses listdir().  Otherwise we run the risk of enumerating
+            #  lots of directories that will just be thrown away.
+            for item in super(WrapFS, self).walkfiles(path, wildcard, dir_wildcard, search, ignore_errors):
+                yield item
+        #  Otherwise, the wrapped FS may provide a more efficient impl
+        #  which we can use directly.
+        else:
+            if wildcard is not None and not callable(wildcard):
+                wildcard_re = re.compile(fnmatch.translate(wildcard))
+                wildcard = lambda fn: bool(wildcard_re.match(fn))
+            for filepath in self.wrapped_fs.walkfiles(path, search=search, ignore_errors=ignore_errors):
+                filepath = abspath(self._decode(filepath))
+                if wildcard is not None:
+                    if not wildcard(basename(filepath)):
+                        continue
+                yield filepath
+
+    def walk(self, path="/", wildcard=None, dir_wildcard=None, search="breadth", ignore_errors=False):
+        if dir_wildcard is not None:
+            for item in super(WrapFS, self).walk(path, wildcard, dir_wildcard, search, ignore_errors):
+                yield item
+        else:
+            if wildcard is not None and not callable(wildcard):
+                wildcard_re = re.compile(fnmatch.translate(wildcard))
+                wildcard = lambda fn: bool(wildcard_re.match(fn))
+            for (dirpath, filepaths) in self.wrapped_fs.walk(path, search=search,
+                                                             ignore_errors=ignore_errors):
+                filepaths = [basename(self._decode(pathcombine(dirpath, p)))
+                             for p in filepaths]
+                if wildcard is not None:
+                    filepaths = [p for p in filepaths if wildcard(p)]
+                yield (dirpath, filepaths)
+
+    def walkdirs(self, path="/", wildcard=None, search="breadth", ignore_errors=False):
+        return super(WrapFS, self).walkdirs(path, wildcard, search, ignore_errors)
 
     def getinfo(self, path):
         """
