@@ -86,16 +86,22 @@ class PartedFS(WrapFS):
         if self.isdir(path):
             raise ResourceInvalidError(path)
 
-        for part in self.listparts(path, absolute=True):
+        for part in self.listparts(path, full=True):
             self.wrapped_fs.remove(part)
 
     def isdir(self, path):
         return self.wrapped_fs.isdir(path)
 
     def makedir(self, path, *args, **kwds):
+        if self.isfile(path):
+            raise ResourceInvalidError(path)
+
         return self.wrapped_fs.makedir(path, *args, **kwds)
 
     def movedir(self, src, dst, **kwds):
+        return self.wrapped_fs.movedir(src, dst, **kwds)
+
+    def copydir(self, src, dst, **kwds):
         return self.wrapped_fs.movedir(src, dst, **kwds)
 
     def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False,
@@ -195,17 +201,19 @@ class PartedFS(WrapFS):
         if self.isdir(src):
             self.wrapped_fs.rename(src, dst)
         else:
-            for idx, part in enumerate(sorted(self.listparts(src, absolute=True))):
+            for idx, part in enumerate(sorted(self.listparts(src, full=True))):
                 part_src = self._encode(self._decode(part), part_index=idx)
                 part_dst = self._encode(dst, part_index=idx)
                 self.wrapped_fs.rename(part_src, part_dst)
 
-    def walkfiles(self, path="/", wildcard=None, dir_wildcard=None, search="breadth", ignore_errors=False):
+    def walkfiles(self, path="/", wildcard=None, dir_wildcard=None, search="breadth",
+                  ignore_errors=False):
         if dir_wildcard is not None:
             #  If there is a dir_wildcard, fall back to the default impl
             #  that uses listdir().  Otherwise we run the risk of enumerating
             #  lots of directories that will just be thrown away.
-            for item in super(WrapFS, self).walkfiles(path, wildcard, dir_wildcard, search, ignore_errors):
+            for item in super(WrapFS, self).walkfiles(path, wildcard, dir_wildcard, search,
+                                                      ignore_errors):
                 yield item
         #  Otherwise, the wrapped FS may provide a more efficient impl
         #  which we can use directly.
@@ -213,16 +221,19 @@ class PartedFS(WrapFS):
             if wildcard is not None and not callable(wildcard):
                 wildcard_re = re.compile(fnmatch.translate(wildcard))
                 wildcard = lambda fn: bool(wildcard_re.match(fn))
-            for filepath in self.wrapped_fs.walkfiles(path, search=search, ignore_errors=ignore_errors):
+            for filepath in self.wrapped_fs.walkfiles(path, search=search,
+                                                      ignore_errors=ignore_errors):
                 filepath = abspath(self._decode(filepath))
                 if wildcard is not None:
                     if not wildcard(basename(filepath)):
                         continue
                 yield filepath
 
-    def walk(self, path="/", wildcard=None, dir_wildcard=None, search="breadth", ignore_errors=False):
+    def walk(self, path="/", wildcard=None, dir_wildcard=None, search="breadth",
+             ignore_errors=False):
         if dir_wildcard is not None:
-            for item in super(WrapFS, self).walk(path, wildcard, dir_wildcard, search, ignore_errors):
+            for item in super(WrapFS, self).walk(path, wildcard, dir_wildcard, search,
+                                                 ignore_errors):
                 yield item
         else:
             if wildcard is not None and not callable(wildcard):

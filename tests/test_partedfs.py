@@ -22,6 +22,34 @@ class TestExternalPartedFS(unittest.TestCase, FSTestCases):
     def tearDown(self):
         self.fs.close()
 
+    @mark.xfail(reason="Appending does not work yet")
+    def test_readwriteappendseek(self):
+        super(TestExternalPartedFS, self).test_readwriteappendseek()
+
+    @mark.xfail(reason="FS does not support getcontents and setcontents yet")
+    def test_copydir(self):
+        super(TestExternalPartedFS, self).test_copydir()
+
+    @mark.xfail(reason="FS does not support getcontents and setcontents yet")
+    def test_copydir_with_dotfile(self):
+        super(TestExternalPartedFS, self).test_copydir_with_dotfile()
+
+    @mark.xfail(reason="FS does not support getcontents and setcontents yet")
+    def test_copyfile(self):
+        super(TestExternalPartedFS, self).test_copyfile()
+
+    @mark.xfail(reason="FS does not support getcontents and setcontents yet")
+    def test_movefile(self):
+        super(TestExternalPartedFS, self).test_movefile()
+
+    @mark.xfail(reason="FS is not truncatable")
+    def test_truncate_to_larger_size(self):
+        super(TestExternalPartedFS, self).test_truncate_to_larger_size()
+
+    @mark.xfail(reason="FS is not truncatable")
+    def test_truncate(self):
+        super(TestExternalPartedFS, self).test_truncate()
+
 
 class TestPartedFS(object):
     @fixture
