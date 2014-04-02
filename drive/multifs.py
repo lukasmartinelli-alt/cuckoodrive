@@ -1,16 +1,27 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+from fs.errors import NoMetaError
 
 from fs.multifs import MultiFS
 
 
-class WritableMultiFS(MultiFS):
-    def best_writefs(self):
-        return max(self.fs_sequence, key=lambda fs: fs.getmeta("free_space"))
+def free_space(fs):
+    if fs.hasmeta("free_space"):
+        return fs.getmeta("free_space")
+    if hasattr(fs, "cur_size") and hasattr(fs, "max_size"):
+        return fs.max_size - fs.cur_size
+    raise NoMetaError(meta_name="free_space", msg="FS has no meta information about free space")
 
-    def open(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
-             line_buffering=False, **kwargs):
-        if 'w' in mode or '+' in mode or 'a' in mode:
-            self.setwritefs(self.best_writefs())
-        return super(WritableMultiFS, self).open(path, mode, buffering, encoding, errors, newline,
-                                             line_buffering)
+    
+class WritableMultiFS(MultiFS):
+    @property
+    def writefs(self):
+        if len(self.fs_sequence) > 0:
+            return max(self.fs_sequence, key=free_space)
+        else:
+            return None
+
+    @writefs.setter
+    def writefs(self, value):
+        if value is not None:
+            raise AttributeError("Cannot set writefs with other value than None as it is determined dynamically")

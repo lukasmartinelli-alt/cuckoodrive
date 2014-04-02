@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+from fs.wrapfs.limitsizefs import LimitSizeFS
 from mock import Mock
 
-from pytest import fixture
+from pytest import fixture, raises
 
 from fs.errors import NoMetaError
 from fs.memoryfs import MemoryFS
 
-from drive.multifs import WritableMultiFS
+from drive.multifs import WritableMultiFS, free_space
 from drive.utils import mb
 
 
@@ -37,15 +38,43 @@ class TestWritableMultiFS(object):
 
         return multifs
 
-    def test_best_writefs_returns_fs_with_most_free_space(self, fs):
-        #Act & Assert
-        assert fs.best_writefs() == fs.fs_lookup["fs1"]
-
-    def test_open_sets_best_writfs_as_new_writefs_for_write_mode(self, fs):
+    def test_free_space_returns_meta_if_has_meta(self):
         #Arrange
-        path = "backup.tar"
-        fs.best_writefs = lambda: fs.fs_lookup["fs1"]
+        fs = MemoryFS()
+        fs.getmeta = Mock(return_value=mb(230))
         #Act
-        fs.open(path, mode="w")
+        space = free_space(fs)
         #Assert
-        assert fs.writefs == fs.best_writefs()
+        assert space == mb(230)
+
+    def test_free_space_returns_cur_size_if_is_limitsizefs(self):
+        #Arrange
+        fs = LimitSizeFS(MemoryFS(), mb(230))
+        #Act
+        space = free_space(fs)
+        #Assert
+        assert space == mb(230)
+
+    def test_free_space_raises_meta_error_if_no_size_info(self):
+        #Arrange
+        fs = MemoryFS()
+        #Act & Assert
+        with raises(NoMetaError):
+            free_space(fs)
+
+    def test_writefs_returns_fs_with_most_free_space(self, fs):
+        #Act & Assert
+        assert fs.writefs == fs.fs_lookup["fs1"]
+
+    def test_writefs_returns_none_if_no_fs(self):
+        #Arrange
+        multifs = WritableMultiFS()
+        #Act & Assert
+        assert multifs.writefs is None
+
+    def test_set_writefs_raises_error_if_value_not_none(self):
+        #Arrange
+        multifs = WritableMultiFS()
+        #Act & Assert
+        with raises(AttributeError):
+            multifs.writefs = MemoryFS()
