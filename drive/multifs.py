@@ -12,12 +12,13 @@ def free_space(fs):
         return fs.max_size - fs.cur_size
     raise NoMetaError(meta_name="free_space", msg="FS has no meta information about free space")
 
-    
+
 class WritableMultiFS(MultiFS):
     @property
     def writefs(self):
-        if len(self.fs_sequence) > 0:
-            return max(self.fs_sequence, key=free_space)
+        writable_fs = [fs for fs in self.fs_sequence if not fs.closed]
+        if len(writable_fs) > 0:
+            return max(writable_fs, key=free_space)
         else:
             return None
 

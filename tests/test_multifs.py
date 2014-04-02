@@ -1,15 +1,48 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+import unittest
+from fs.tests import FSTestCases
 from fs.wrapfs.limitsizefs import LimitSizeFS
 from mock import Mock
 
-from pytest import fixture, raises
+from pytest import fixture, raises, mark
 
 from fs.errors import NoMetaError
 from fs.memoryfs import MemoryFS
 
 from drive.multifs import WritableMultiFS, free_space
 from drive.utils import mb
+
+
+class TestExternalWritableMultiFS(unittest.TestCase, FSTestCases):
+    def setUp(self):
+        multifs = WritableMultiFS()
+        fs1 = LimitSizeFS(MemoryFS(), mb(230))
+        fs2 = LimitSizeFS(MemoryFS(), mb(300))
+
+        multifs.addfs("fs1", fs1)
+        multifs.addfs("fs2", fs2)
+
+        self.fs = multifs
+
+    def tearDown(self):
+        self.fs.close()
+
+    @mark.xfail(reason="Combination of LimitSizeFS and MultiFS does not work properly")
+    def test_listdir(self):
+        super(TestExternalWritableMultiFS, self).test_listdir()
+
+    @mark.xfail(reason="Combination of LimitSizeFS and MultiFS does not work properly")
+    def test_listdirinfo(self):
+        super(TestExternalWritableMultiFS, self).test_listdirinfo()
+
+    @mark.xfail(reason="Combination of LimitSizeFS and MultiFS does not work properly")
+    def test_open_on_directory(self):
+        super(TestExternalWritableMultiFS, self).test_open_on_directory()
+
+    @mark.xfail(reason="Combination of LimitSizeFS and MultiFS does not work properly")
+    def test_remove(self):
+        super(TestExternalWritableMultiFS, self).test_remove()
 
 
 class TestWritableMultiFS(object):
@@ -70,6 +103,15 @@ class TestWritableMultiFS(object):
         #Arrange
         multifs = WritableMultiFS()
         #Act & Assert
+        assert multifs.writefs is None
+
+    def test_writefs_returns_none_if_all_fs_closed(self):
+        #Arrange
+        multifs = WritableMultiFS()
+        fs1 = MemoryFS()
+        multifs.addfs("fs1", fs1)
+        fs1.close()
+        #Act
         assert multifs.writefs is None
 
     def test_set_writefs_raises_error_if_value_not_none(self):
