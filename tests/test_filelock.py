@@ -23,14 +23,14 @@ class TestFileLock:
         return fs
 
     def test_acquire_lock_and_close_it(self, fs):
-        #Act
+        # Act
         with FileLock(fs):
             assert True  # We got lock successfully
 
     def test_acquire_when_file_already_exists(self, fs):
-        #Arrange
+        # Arrange
         with fs.open(".lock", "w"):
-            #Act & Assert
+            # Act & Assert
             with raises(FileLockError):
                 with FileLock(fs, timeout=1):
                     assert False  # We shouldnt get the lock

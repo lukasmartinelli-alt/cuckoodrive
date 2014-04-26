@@ -16,15 +16,16 @@ class PartedFS(WrapFS):
     This filesystem uses an underlying filesystem to translate the many small files back and forth.
 
     The process actually takes a large file and splits it into parts with a max size.
-    So a file like 'backup.tar' in the folder '/backups' with 240 MB will translate into following files::
+    So a file like 'backup.tar' in the folder '/backups' with 240 MB
+    will translate into following files::
 
     `-- backups
         |-- backup.tar.part0 (100MB)
         |-- backup.tar.part1 (100MB)
         `-- backup.tar.part2 (40MB)
 
-    If the max part size would have been set to 300 MB, there will only be a single file, but for simplicity sake,
-    still managed as a part (so we can easily extend the file later)::
+    If the max part size would have been set to 300 MB, there will only be a single file,
+    but for simplicity sake, still managed as a part (so we can easily extend the file later)::
 
     `-- backups
         `-- backup.tar.part0 (240MB)
@@ -107,8 +108,9 @@ class PartedFS(WrapFS):
     def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False,
                 files_only=False):
         """
-        Lists the file and directories under a given path. This will return all .part0 files in the
-        underlying fs as files and the other normal dirs as dirs.
+        Lists the file and directories under a given path.
+        This will return all .part0 files in the underlying fs as files
+        and the other normal dirs as dirs.
         """
         if self.isfile(path):
             raise ResourceInvalidError(path)
@@ -285,11 +287,8 @@ class PartedFS(WrapFS):
             part_dst = self._encode(dst, idx)
             self.wrapped_fs.copy(part_src, part_dst, **kwds)
 
-
     def getsize(self, path):
-        """
-            Calculates the sum of all parts as filesize
-            """
+        """Calculates the sum of all parts as filesize"""
         if not self.exists(path):
             raise ResourceNotFoundError(path)
         return sum([self.wrapped_fs.getsize(part) for part in self.listparts(path)])
@@ -307,10 +306,11 @@ class PartedFile(FileLikeBase):
     """
     A PartedFile is composed out of many other smaller files (FilePart).
     A PartedFile has a current_part attribute, where the current part is calculated based on the
-    internal file pointer.
-    The FileLikeBase implements alot of functionality that allows us to keep this class lightweight.
-    The _write method for example, just tries to write the data, that can fit into the current part,
-    the rest is returned. The FileLikeBase will buffer that by itself and look that this will be written again.
+    internal file pointer. The FileLikeBase implements alot of functionality that allows us to
+    keep this class lightweight.
+    The _write method for example, just tries to write the data, that can fit into the current
+    part, the rest is returned.
+    The FileLikeBase will buffer that by itself and look that this will be written again.
     """
 
     def __init__(self, fs, path, mode, parts, max_part_size):
@@ -412,8 +412,8 @@ class PartedFile(FileLikeBase):
 
 class FilePart(FileWrapper):
     """
-    A part of a file (PartedFile) that can reach a maximum size and then must be extended to another part.
+    A part of a file (PartedFile) that can reach a maximum size and then must
+    be extended to another part.
     """
-
     def __init__(self, wrapped_file):
         super(FilePart, self).__init__(wrapped_file)

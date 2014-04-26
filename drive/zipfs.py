@@ -6,8 +6,8 @@ from fs.wrapfs import WrapFS
 
 class ZipCompressionFS(WrapFS):
     """
-    The ZipCompressionFS creates a ZipFile for every single file given but retains the normal folder
-    structure. This does not result in the best compression, because we would have mor
+    The ZipCompressionFS creates a ZipFile for every single file given but retains the normal
+    folder structure. This does not result in the best compression, because we would have more
     redundancy when we would compress bigger chunks, but has other useful features.
     """
 

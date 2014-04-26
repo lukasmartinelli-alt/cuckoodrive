@@ -72,51 +72,51 @@ class TestWritableMultiFS(object):
         return multifs
 
     def test_free_space_returns_meta_if_has_meta(self):
-        #Arrange
+        # Arrange
         fs = MemoryFS()
         fs.getmeta = Mock(return_value=mb(230))
-        #Act
+        # Act
         space = free_space(fs)
-        #Assert
+        # Assert
         assert space == mb(230)
 
     def test_free_space_returns_cur_size_if_is_limitsizefs(self):
-        #Arrange
+        # Arrange
         fs = LimitSizeFS(MemoryFS(), mb(230))
-        #Act
+        # Act
         space = free_space(fs)
-        #Assert
+        # Assert
         assert space == mb(230)
 
     def test_free_space_raises_meta_error_if_no_size_info(self):
-        #Arrange
+        # Arrange
         fs = MemoryFS()
-        #Act & Assert
+        # Act & Assert
         with raises(NoMetaError):
             free_space(fs)
 
     def test_writefs_returns_fs_with_most_free_space(self, fs):
-        #Act & Assert
+        # Act & Assert
         assert fs.writefs == fs.fs_lookup["fs1"]
 
     def test_writefs_returns_none_if_no_fs(self):
-        #Arrange
+        # Arrange
         multifs = WritableMultiFS()
-        #Act & Assert
+        # Act & Assert
         assert multifs.writefs is None
 
     def test_writefs_returns_none_if_all_fs_closed(self):
-        #Arrange
+        # Arrange
         multifs = WritableMultiFS()
         fs1 = MemoryFS()
         multifs.addfs("fs1", fs1)
         fs1.close()
-        #Act
+        # Act
         assert multifs.writefs is None
 
     def test_set_writefs_raises_error_if_value_not_none(self):
-        #Arrange
+        # Arrange
         multifs = WritableMultiFS()
-        #Act & Assert
+        # Act & Assert
         with raises(AttributeError):
             multifs.writefs = MemoryFS()
