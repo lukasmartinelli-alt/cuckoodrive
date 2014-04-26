@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
+from operator import itemgetter
 from os import urandom
 from datetime import timedelta, date
 from fs.tests import FSTestCases
@@ -98,7 +99,7 @@ class TestPartedFS(object):
         #Act
         listing = fs_with_test_file.listparts("backup.tar")
         #Assert
-        assert listing == ["backup.tar.part0", "backup.tar.part1"]
+        assert sorted(listing) == ["backup.tar.part0", "backup.tar.part1"]
 
     def test_exists_returns_true_when_first_part_could_be_found(self, fs):
         #Arrange
@@ -151,15 +152,15 @@ class TestPartedFS(object):
 
     def test_listdir_returns_only_files(self, fs_with_folder_structure):
         #Act
-        listing = fs_with_folder_structure.listdir(files_only=True)
+        listing = sorted(fs_with_folder_structure.listdir(files_only=True))
         #Assert
         assert listing == ["README.txt", "backup.tar"]
 
     def test_listdir_returns_files_and_directories(self, fs_with_folder_structure):
         #Act
-        listing = fs_with_folder_structure.listdir()
+        listing = sorted(fs_with_folder_structure.listdir())
         #Assert
-        assert listing == ["older_backups", "README.txt", "backup.tar"]
+        assert listing == ["README.txt", "backup.tar", "older_backups"]
 
     def test_listdirinfo_raises_error_when_not_exists(self, fs):
         #Act & Assert
@@ -171,9 +172,9 @@ class TestPartedFS(object):
         info = {}
         fs_with_folder_structure.getinfo = Mock(return_value=info)
         #Act
-        listing = fs_with_folder_structure.listdirinfo()
+        listing = sorted(fs_with_folder_structure.listdirinfo(), key=itemgetter(0))
         #Assert
-        assert listing == [("older_backups", info), ("README.txt", info), ("backup.tar", info)]
+        assert listing == [("README.txt", info), ("backup.tar", info), ("older_backups", info)]
 
 
     def test_open_if_w_in_mode_all_parts_should_be_removed(self, fs_with_test_file):
