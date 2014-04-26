@@ -260,7 +260,7 @@ class PartedFS(WrapFS):
 
         if self.isfile(path):
             info = {}
-            info['st_mode'] = 0666 | stat.S_IFREG
+            info['st_mode'] = 0o666 | stat.S_IFREG
             part_infos = [self.wrapped_fs.getinfo(part) for part in self.listparts(path)]
 
             if len(part_infos) > 0:
