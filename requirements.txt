@@ -1,6 +1,0 @@
-mock
-fs
-pytest
-coverage
-coveralls
-dropbox==2.0.0
