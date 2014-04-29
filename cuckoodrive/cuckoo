@@ -5,6 +5,7 @@ CuckooDrive emulates a user filesystem that aggregates all the free space provid
 cloud storage providers into one big drive.
 
 Usage:
+  cuckoo develmount <path> <source>...
   cuckoo mount <path>
   cuckoo status
   cuckoo (-h | --help)
@@ -14,14 +15,41 @@ Options:
   -h --help     Show this screen.
   --version     Show version.
   --fuse        Mount the filesystem using FUSE.
-  --dokan      Mount the filesysytem using DOKAN..
-
+  --dokan       Mount the filesysytem using DOKAN
+  --devel       Mount several filesystems that act as if they are Cloud Storages
 """
 from __future__ import print_function, division, absolute_import, unicode_literals
 import sys
 import shutil
 
 from docopt import docopt
+
+from fs.osfs import OSFS
+from fs.expose import fuse
+from fs.wrapfs.limitsizefs import LimitSizeFS
+
+
+from cuckoodrive.multifs import WritableMultiFS
+from cuckoodrive.partedfs import PartedFS
+from cuckoodrive.utils import mb
+
+
+def mount_devel(path, sources):
+    """Create a PyFilesystem that acts like a CuckooDrive"""
+    multifs = WritableMultiFS()
+
+    for source_path in sources:
+        fs = LimitSizeFS(OSFS(source_path), mb(50))
+        multifs.addfs(source_path, fs)
+
+    partedfs = PartedFS(multifs, mb(10))
+
+    try:
+        mp = fuse.mount(partedfs, path, foreground=True)
+        print("Mounted devel at " + mp.path)
+    except RuntimeError:
+        print("Failed mounting devel")
+        raise
 
 
 def mount_fuse(path):
@@ -50,6 +78,11 @@ def main(arguments):
         if sys.platform.startswith('win'):
             print("Mounting with Dokan")
             mount_dokan(path)
+
+    if arguments["develmount"]:
+        path = arguments["<path>"]
+        sources = arguments["<source>"]
+        mount_devel(path, sources)
 
 if __name__ == "__main__":
     arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
