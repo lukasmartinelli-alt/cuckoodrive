@@ -10,8 +10,8 @@ from pytest import fixture, raises, mark
 from fs.errors import NoMetaError
 from fs.memoryfs import MemoryFS
 
-from drive.multifs import WritableMultiFS, free_space
-from drive.utils import mb
+from cuckoodrive.multifs import WritableMultiFS, free_space
+from cuckoodrive.utils import mb
 
 
 class TestExternalWritableMultiFS(unittest.TestCase, FSTestCases):

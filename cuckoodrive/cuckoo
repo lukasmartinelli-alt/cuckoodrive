@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+CuckooDrive emulates a user filesystem that aggregates all the free space provided on various
+cloud storage providers into one big drive.
+
+Usage:
+  cuckoo mount <path>
+  cuckoo status
+  cuckoo (-h | --help)
+  cuckoo --version
+
+Options:
+  -h --help     Show this screen.
+  --version     Show version.
+  --fuse        Mount the filesystem using FUSE.
+  --dokan      Mount the filesysytem using DOKAN..
+
+"""
+from __future__ import print_function, division, absolute_import, unicode_literals
+import sys
+import shutil
+
+from docopt import docopt
+
+
+def mount_fuse(path):
+    """Try to mount the CuckooDrive with FUSE at the specified path"""
+    if not shutil.which("fusermount"):
+        print("Fuse could not be found in path.")
+        print("Please install fuse to mount with CuckooDrive")
+        sys.exit()
+
+    print("Mounting with FUSE at " + path)
+
+
+def mount_dokan(path):
+    """Try to mount the CuckooDrive with Dokan at the specified path"""
+    print("Mounting with Dokan is not supported yet")
+    sys.exit()
+
+
+def main(arguments):
+    print(arguments)
+
+    if arguments["mount"]:
+        path = arguments["<path>"]
+        if sys.platform.startswith("linux"):
+            mount_fuse(path)
+        if sys.platform.startswith('win'):
+            print("Mounting with Dokan")
+            mount_dokan(path)
+
+if __name__ == "__main__":
+    arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
+    main(arguments)

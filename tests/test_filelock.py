@@ -4,7 +4,7 @@ from pytest import fixture, raises
 
 from fs.memoryfs import MemoryFS
 
-from drive.filelock import FileLock, FileLockError
+from cuckoodrive.filelock import FileLock, FileLockError
 
 
 class TestFileLock:

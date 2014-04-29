@@ -12,8 +12,8 @@ from fs.memoryfs import MemoryFS
 from fs.errors import ResourceNotFoundError, ResourceInvalidError
 import unittest
 
-from drive.partedfs import PartedFS, PartedFile, FilePart, InvalidFilePointerLocation
-from drive.utils import kb
+from cuckoodrive.partedfs import PartedFS, PartedFile, FilePart, InvalidFilePointerLocation
+from cuckoodrive.utils import kb
 
 
 class TestExternalPartedFS(unittest.TestCase, FSTestCases):
