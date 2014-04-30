@@ -27,7 +27,8 @@ from docopt import docopt
 from fs.osfs import OSFS
 from fs.expose import fuse
 from fs.wrapfs.limitsizefs import LimitSizeFS
-
+from fs.wrapfs.debugfs import DebugFS
+from fs.path import basename
 
 from cuckoodrive.multifs import WritableMultiFS
 from cuckoodrive.partedfs import PartedFS
@@ -35,18 +36,34 @@ from cuckoodrive.utils import mb
 
 
 def mount_devel(path, sources):
-    """Create a PyFilesystem that acts like a CuckooDrive"""
+    """
+    Mount the given source filesystems with OSFS and limit them to 20MB.
+    All output of the filesystems is logged to output.
+    To aggregate the mounted source filesystems a combination of PartedFS and MultiFS
+    is mounted at the specified path.
+    """
+    skip_methods = ('listdir', 'listdirinfo', 'getinfo', 'exists', 'isfile', 'getsize')
     multifs = WritableMultiFS()
 
     for source_path in sources:
-        fs = LimitSizeFS(OSFS(source_path), mb(50))
+        fs = DebugFS(LimitSizeFS(OSFS(source_path), mb(20)),
+                     identifier="OSFS@" + basename(source_path),
+                     skip=skip_methods, verbose=False)
         multifs.addfs(source_path, fs)
 
-    partedfs = PartedFS(multifs, mb(10))
+    debug_multifs = DebugFS(multifs, identifier="MultiFS@" + basename(path),
+                            skip=skip_methods, verbose=False)
+    partedfs = PartedFS(debug_multifs, mb(2))
+    debugfs = DebugFS(partedfs, identifier="PartedFS@" + basename(path),
+                      skip=skip_methods, verbose=False)
 
     try:
-        mp = fuse.mount(partedfs, path, foreground=True)
+        mp = fuse.mount(debugfs, path)
         print("Mounted devel at " + mp.path)
+        print("Press any key to unmount")
+        raw_input()
+        print("Unmounting devel")
+        mp.unmount()
     except RuntimeError:
         print("Failed mounting devel")
         raise
