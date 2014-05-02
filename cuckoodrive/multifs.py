@@ -64,3 +64,9 @@ class WritableMultiFS(MultiFS):
         return super(WritableMultiFS, self).open(path, mode=mode, buffering=buffering,
                                                  encoding=encoding, errors=errors, newline=newline,
                                                  line_buffering=line_buffering, **kwargs)
+
+    def remove(self, path):
+        """Remove the file on all filesystems"""
+        for fs in self:
+            if fs.exists(path):
+                fs.remove(path)

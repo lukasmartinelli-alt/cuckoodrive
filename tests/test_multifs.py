@@ -118,7 +118,24 @@ class TestWritableMultiFS(object):
 
         # Act
         with fs.open("backup.tar.part0", mode="r+b") as fh:
-            fh.write(urandom(kb(4)))
+            fh.write(urandom(kb(5)))
 
         with fs.open("backup.tar.part1", mode="r+b") as fh:
-            fh.write(urandom(kb(4)))
+            fh.write(urandom(kb(2)))
+
+        # Assert
+        assert fs.getsize("backup.tar.part0") == kb(5)
+        assert fs.getsize("backup.tar.part1") == kb(3)
+
+    def test_remove_switches_writefs_to_location_of_existing_file(self, fs):
+        # Arrange
+        fs.fs_lookup["fs1"].setcontents("backup.tar.part0", data=urandom(kb(4)))
+        fs.fs_lookup["fs2"].setcontents("backup.tar.part1", data=urandom(kb(3)))
+
+        # Act
+        fs.remove("backup.tar.part0")
+        fs.remove("backup.tar.part1")
+
+        # Assert
+        assert not fs.exists("backup.tar.part0")
+        assert not fs.exists("backup.tar.part1")
