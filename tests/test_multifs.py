@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
-import unittest
-from fs.tests import FSTestCases
-from fs.wrapfs.limitsizefs import LimitSizeFS
-from mock import Mock
 
+from os import urandom
+
+import unittest
+from mock import Mock
 from pytest import fixture, raises, mark
 
+from fs.tests import FSTestCases
+from fs.wrapfs.limitsizefs import LimitSizeFS
 from fs.errors import NoMetaError
 from fs.memoryfs import MemoryFS
 
 from cuckoodrive.multifs import WritableMultiFS, free_space
-from cuckoodrive.utils import mb
+from cuckoodrive.utils import mb, kb
 
 
 class TestExternalWritableMultiFS(unittest.TestCase, FSTestCases):
@@ -50,21 +52,9 @@ class TestWritableMultiFS(object):
     @fixture
     def fs(self):
         multifs = WritableMultiFS()
-        fs1 = MemoryFS()
-        fs2 = MemoryFS()
 
-        def getmeta_fs1(meta_name):
-            if meta_name == "free_space":
-                return mb(300)
-            raise NoMetaError(meta_name)
-
-        def getmeta_fs2(meta_name):
-            if meta_name == "free_space":
-                return mb(240)
-            raise NoMetaError(meta_name)
-
-        fs1.getmeta = getmeta_fs1
-        fs2.getmeta = getmeta_fs2
+        fs1 = LimitSizeFS(MemoryFS(), mb(300))
+        fs2 = LimitSizeFS(MemoryFS(), mb(240))
 
         multifs.addfs("fs1", fs1)
         multifs.addfs("fs2", fs2)
@@ -120,3 +110,15 @@ class TestWritableMultiFS(object):
         # Act & Assert
         with raises(AttributeError):
             multifs.writefs = MemoryFS()
+
+    def test_open_switches_writefs_to_location_of_existing_file(self, fs):
+        # Arrange
+        fs.fs_lookup["fs1"].setcontents("backup.tar.part0", data=urandom(kb(4)))
+        fs.fs_lookup["fs2"].setcontents("backup.tar.part1", data=urandom(kb(3)))
+
+        # Act
+        with fs.open("backup.tar.part0", mode="r+b") as fh:
+            fh.write(urandom(kb(4)))
+
+        with fs.open("backup.tar.part1", mode="r+b") as fh:
+            fh.write(urandom(kb(4)))

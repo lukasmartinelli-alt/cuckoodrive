@@ -48,3 +48,19 @@ class WritableMultiFS(MultiFS):
         if value is not None:
             raise AttributeError("Cannot set writefs with other value than None \
             as it is determined dynamically")
+
+    def open(self, path, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
+             line_buffering=False, **kwargs):
+        """Search the file and open it on the fileystem where it exists if read mode is specified.
+        Otherwise the best writefs will be choosen and a file created.
+        """
+        if 'r' in mode:
+            for fs in self:
+                if fs.exists(path):
+                    return fs.open(path, mode=mode, buffering=buffering, encoding=encoding,
+                                   errors=errors, newline=newline, line_buffering=line_buffering,
+                                   **kwargs)
+
+        return super(WritableMultiFS, self).open(path, mode=mode, buffering=buffering,
+                                                 encoding=encoding, errors=errors, newline=newline,
+                                                 line_buffering=line_buffering, **kwargs)
