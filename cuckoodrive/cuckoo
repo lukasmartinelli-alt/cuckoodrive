@@ -5,8 +5,11 @@ CuckooDrive emulates a user filesystem that aggregates all the free space provid
 cloud storage providers into one big drive.
 
 Usage:
-  cuckoo develmount <path> <source>...
-  cuckoo mount <path>
+  cuckoo init
+  cuckoo remote add <name> <filesystem>
+  cuckoo remote remove <name>
+  cuckoo sync [-v | --verbose]
+  cuckoo mount [--fuse | --dokan] [-v | --verbose]
   cuckoo status
   cuckoo (-h | --help)
   cuckoo --version
@@ -15,8 +18,34 @@ Options:
   -h --help     Show this screen.
   --version     Show version.
   --fuse        Mount the filesystem using FUSE.
-  --dokan       Mount the filesysytem using DOKAN
-  --devel       Mount several filesystems that act as if they are Cloud Storages
+  --dokan       Mount the filesystem using DOKAN
+  -v --verbose  Print all filesystem actions to stdout
+
+Example #1:
+  # Initialize the current directory as a cuckoo drive
+  cuckoo init
+
+  # Add dropbox as a remote filesystem
+  cuckoo remote add dropbox dropbox://morgenkaffee/cuckoo
+
+  # Synchronize the cuckoo drive with the remote filesystems
+  cuckoo sync
+
+Example #2:
+  # Initialize a directory as a cuckoo drive
+  cuckoo init
+
+  #Add googledrive as remote filesystem
+  cuckoo remote add googledrive gdrive://morgenkaffee/cuckoo
+
+  #Add box.net as remote filesystem
+  cuckoo remote add boxdotnet boxnet://morgenkaffee/cuckoo
+
+  # Mount the cuckoodrive directly
+  cuckoo mount
+
+  # Upload a backup to cuckoodrive
+  cp /path/to/backup.tar .
 """
 from __future__ import print_function, division, absolute_import, unicode_literals
 import sys
@@ -33,6 +62,50 @@ from fs.path import basename
 from cuckoodrive.multifs import WritableMultiFS
 from cuckoodrive.partedfs import PartedFS
 from cuckoodrive.utils import mb
+
+
+def init(path):
+    """
+    Initialize a new cuckoo drive in the current folder.
+    This will create a .cuckoo.yml file where the configuration is stored.
+    """
+    pass
+
+
+def sync(path):
+    """
+    Synchronizes the current cuckoo drive directly with the remote filesystems.
+    """
+    pass
+
+
+def mount(path):
+    """
+    Mount the remote filesystems as a FUSE or Dokan filesystem.
+    This allows you to use cuckoo drive exactly for your purposes.
+    """
+    pass
+
+
+def add_remote(path, name, filesystem):
+    """
+    Add a remote filesystem to the configuration file after successful authentication.
+    """
+    pass
+
+
+def remove_remote(path, name):
+    """
+    Remove the remote filesystem
+    """
+    pass
+
+
+def status(path):
+    """
+    Print the status of the chosen cuckoo drive.
+    """
+    pass
 
 
 def mount_devel(path, sources):
