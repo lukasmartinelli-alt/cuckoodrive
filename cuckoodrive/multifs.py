@@ -13,10 +13,11 @@ def free_space(fs):
     :raise NoMetaError: If filesystem has no information about how much free space is left a
     NoMetaError exception is raised.
     """
+    if hasattr(fs, "cur_size") and hasattr(fs, "max_size"):
+        return fs.max_size - fs._get_cur_size()
     if fs.hasmeta("free_space"):
         return fs.getmeta("free_space")
-    if hasattr(fs, "cur_size") and hasattr(fs, "max_size"):
-        return fs.max_size - fs.cur_size
+
     raise NoMetaError(meta_name="free_space", msg="FS has no meta information about free space")
 
 
