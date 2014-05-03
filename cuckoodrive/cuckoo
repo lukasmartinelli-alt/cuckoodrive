@@ -6,7 +6,7 @@ cloud storage providers into one big drive.
 
 Usage:
   cuckoo init
-  cuckoo remote add <name> <filesystem>
+  cuckoo remote add <name> <fs_uri>
   cuckoo remote remove <name>
   cuckoo sync [-v | --verbose]
   cuckoo mount [--fuse | --dokan] [-v | --verbose]
@@ -48,131 +48,130 @@ Example #2:
   cp /path/to/backup.tar .
 """
 from __future__ import print_function, division, absolute_import, unicode_literals
+import os
 import sys
-import shutil
 
 from docopt import docopt
+import yaml
 
-from fs.osfs import OSFS
 from fs.expose import fuse
-from fs.wrapfs.limitsizefs import LimitSizeFS
-from fs.wrapfs.debugfs import DebugFS
-from fs.path import basename
+from fs.opener import fsopendir
 
 from cuckoodrive.multifs import WritableMultiFS
 from cuckoodrive.partedfs import PartedFS
 from cuckoodrive.utils import mb
 
 
-def init(path):
+class CuckooDrive:
     """
-    Initialize a new cuckoo drive in the current folder.
-    This will create a .cuckoo.yml file where the configuration is stored.
+    Represents a cuckoo drive either in mounted or in synchronized mode.
     """
-    pass
+    def __init__(self, cuckoo_path):
+        self.path = os.path.join(cuckoo_path, ".cuckoodrive.yml")
+        with open(self.path, mode="r") as fh:
+            self.configuration = yaml.safe_load(fh)
 
+    @staticmethod
+    def exists(cuckoo_path):
+        path = os.path.join(cuckoo_path, ".cuckoodrive.yml")
+        return os.path.exists(path)
 
-def sync(path):
-    """
-    Synchronizes the current cuckoo drive directly with the remote filesystems.
-    """
-    pass
+    @staticmethod
+    def init(cuckoo_path):
+        """
+        Initialize a new cuckoo drive in the current folder.
+        This will create a .cuckoo.yml file where the configuration is stored.
+        """
+        path = os.path.join(cuckoo_path, ".cuckoodrive.yml")
+        template = {
+            "include": ["*"],
+            "exclude": [".cuckoodrive.yml"],
+            "remotes": {}
+        }
+        with open(path, mode="w") as fh:
+            yaml.safe_dump(template, fh)
 
+    def sync(self):
+        """
+        Synchronizes the current cuckoo drive directly with the remote filesystems.
+        """
+        pass
 
-def mount(path):
-    """
-    Mount the remote filesystems as a FUSE or Dokan filesystem.
-    This allows you to use cuckoo drive exactly for your purposes.
-    """
-    pass
+    def mount(self):
+        """
+        Mount the remote filesystems as a FUSE or Dokan filesystem.
+        This allows you to use cuckoo drive exactly for your purposes.
+        """
+        multifs = WritableMultiFS()
+        for name, fs_uri in self.configuration["remotes"].items():
+            remote_fs = fsopendir(fs_uri)
+            multifs.addfs(name, remote_fs)
+        partedfs = PartedFS(multifs, mb(2))
 
+        try:
+            mp = fuse.mount(partedfs, self.path)
+            print("Mounted cuckoo drive at " + mp.path)
+            print("Press any key to unmount")
+            raw_input()
+            print("Unmounting cuckoo drive")
+            mp.unmount()
+        except RuntimeError:
+            print("Failed mounting cuckoo drive")
+            raise
 
-def add_remote(path, name, filesystem):
-    """
-    Add a remote filesystem to the configuration file after successful authentication.
-    """
-    pass
+    def add_remote(self, name, fs_uri):
+        """
+        Add a remote filesystem to the configuration file after successful authentication.
+        """
+        self.configuration["remotes"][name] = fs_uri
+        with open(self.path, mode="w") as fh:
+            yaml.safe_dump(self.configuration, fh)
 
+    def remove_remote(self, name):
+        """
+        Remove the remote filesystem
+        """
+        self.configuration["remotes"].pop(name)
+        with open(self.path, mode="w") as fh:
+            yaml.safe_dump(self.configuration, fh)
 
-def remove_remote(path, name):
-    """
-    Remove the remote filesystem
-    """
-    pass
-
-
-def status(path):
-    """
-    Print the status of the chosen cuckoo drive.
-    """
-    pass
-
-
-def mount_devel(path, sources):
-    """
-    Mount the given source filesystems with OSFS and limit them to 20MB.
-    All output of the filesystems is logged to output.
-    To aggregate the mounted source filesystems a combination of PartedFS and MultiFS
-    is mounted at the specified path.
-    """
-    skip_methods = ('listdir', 'listdirinfo', 'getinfo', 'exists', 'isfile', 'getsize')
-    multifs = WritableMultiFS()
-
-    for source_path in sources:
-        fs = DebugFS(LimitSizeFS(OSFS(source_path), mb(20)),
-                     identifier="OSFS@" + basename(source_path),
-                     skip=skip_methods, verbose=False)
-        multifs.addfs(source_path, fs)
-
-    debug_multifs = DebugFS(multifs, identifier="MultiFS@" + basename(path),
-                            skip=skip_methods, verbose=False)
-    partedfs = PartedFS(debug_multifs, mb(2))
-    debugfs = DebugFS(partedfs, identifier="PartedFS@" + basename(path),
-                      skip=skip_methods, verbose=False)
-
-    try:
-        mp = fuse.mount(debugfs, path)
-        print("Mounted devel at " + mp.path)
-        print("Press any key to unmount")
-        raw_input()
-        print("Unmounting devel")
-        mp.unmount()
-    except RuntimeError:
-        print("Failed mounting devel")
-        raise
-
-
-def mount_fuse(path):
-    """Try to mount the CuckooDrive with FUSE at the specified path"""
-    if not shutil.which("fusermount"):
-        print("Fuse could not be found in path.")
-        print("Please install fuse to mount with CuckooDrive")
-        sys.exit()
-
-    print("Mounting with FUSE at " + path)
-
-
-def mount_dokan(path):
-    """Try to mount the CuckooDrive with Dokan at the specified path"""
-    print("Mounting with Dokan is not supported yet")
-    sys.exit()
+    def status(self):
+        """
+        Print the status of the chosen cuckoo drive.
+        """
+        print("On cuckoo drive {0}".format(self.path))
+        for name, fs in self.configuration["remotes"].items():
+            print("\t {0} at {1}".format(name, fs))
 
 
 def main(arguments):
     print(arguments)
+    path = os.getcwd()
+
+    if arguments["init"]:
+        if CuckooDrive.exists(path):
+            sys.exit("Path has already been initialized")
+        CuckooDrive.init(path)
+
+    if not CuckooDrive.exists(path):
+        sys.exit("This folder is not a cuckoo drive. Use cuckoo init to create a cuckoo drive")
+
+    cuckoodrive = CuckooDrive(path)
+
+    if arguments["status"]:
+        cuckoodrive.status()
+
+    if arguments["remote"]:
+        if arguments["add"]:
+            cuckoodrive.add_remote(arguments["<name>"], arguments["<fs_uri>"])
+
+        if arguments["remove"]:
+            cuckoodrive.remove_remote(arguments["<name>"])
 
     if arguments["mount"]:
         path = arguments["<path>"]
-        if sys.platform.startswith("linux"):
-            mount_fuse(path)
-        if sys.platform.startswith('win'):
-            print("Mounting with Dokan")
-            mount_dokan(path)
+        cuckoodrive.mount()
 
-    if arguments["develmount"]:
-        path = arguments["<path>"]
-        sources = arguments["<source>"]
-        mount_devel(path, sources)
 
 if __name__ == "__main__":
     arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
