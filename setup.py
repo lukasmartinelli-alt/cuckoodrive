@@ -16,7 +16,7 @@ setup(
     keywords = "fs dropbox",
     url = "https://github.com/lukasmartinelli/cuckoodrive",
     packages=['cuckoodrive'],
-    install_requires=['fs', 'dropbox', 'docopt', 'pyyaml'],
+    install_requires=['fs', 'dropbox', 'docopt'],
     include_package_data=True,
     long_description=long_description,
     scripts=['cuckoodrive/cuckoo']

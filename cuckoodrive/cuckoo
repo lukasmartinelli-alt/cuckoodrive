@@ -5,54 +5,29 @@ CuckooDrive emulates a user filesystem that aggregates all the free space provid
 cloud storage providers into one big drive.
 
 Usage:
-  cuckoo init
-  cuckoo remote add <name> <fs_uri>
-  cuckoo remote remove <name>
-  cuckoo sync [-v | --verbose]
-  cuckoo mount [--fuse | --dokan] [-v | --verbose]
-  cuckoo status
+  cuckoo (sync | mount [--fuse | --dokan]) [-v | --verbose] --remotes <fs_uri>...
   cuckoo (-h | --help)
   cuckoo --version
 
 Options:
   -h --help     Show this screen.
+  --remotes     Filesystem URIs of remote filesystems
   --version     Show version.
   --fuse        Mount the filesystem using FUSE.
   --dokan       Mount the filesystem using DOKAN
   -v --verbose  Print all filesystem actions to stdout
 
 Example #1:
-  # Initialize the current directory as a cuckoo drive
-  cuckoo init
-
-  # Add dropbox as a remote filesystem
-  cuckoo remote add dropbox dropbox://morgenkaffee/cuckoo
-
-  # Synchronize the cuckoo drive with the remote filesystems
-  cuckoo sync
+  cuckoo sync --remotes dropbox://morgenkaffee  googledrive://morgenkaffe
 
 Example #2:
-  # Initialize a directory as a cuckoo drive
-  cuckoo init
-
-  #Add googledrive as remote filesystem
-  cuckoo remote add googledrive gdrive://morgenkaffee/cuckoo
-
-  #Add box.net as remote filesystem
-  cuckoo remote add boxdotnet boxnet://morgenkaffee/cuckoo
-
-  # Mount the cuckoodrive directly
-  cuckoo mount
-
-  # Upload a backup to cuckoodrive
-  cp /path/to/backup.tar .
+  cuckoo mount --fuse --remotes googledrive://morgenkaffee
 """
 from __future__ import print_function, division, absolute_import, unicode_literals
 import os
 import sys
 
 from docopt import docopt
-import yaml
 
 from fs.expose import fuse
 from fs.opener import fsopendir
@@ -63,77 +38,44 @@ from cuckoodrive.partedfs import PartedFS
 from cuckoodrive.utils import mb
 
 
-class NotEmptyError(Exception):
-    pass
+class CuckooDrive(object):
+    """Represents a cuckoo drive either in mounted or in synchronized mode."""
+    skip_methods = ('listdir', 'listdirinfo', 'getinfo', 'exists', 'isfile', 'getsize')
+    file_size = mb(10)
+
+    def __init__(self, path, remotes, verbose=False):
+        self.path = path
+        self.remotes = remotes
+        self.verbose = verbose
 
 
-class CuckooDrive:
-    """
-    Represents a cuckoo drive either in mounted or in synchronized mode.
-    """
-    def __init__(self, cuckoo_path):
-        self.path = os.path.join(cuckoo_path, ".cuckoodrive.yml")
-        with open(self.path, mode="r") as fh:
-            self.configuration = yaml.safe_load(fh)
+class MountedCuckooDrive(CuckooDrive):
+    def __init__(self, path, remotes, **kwargs):
+        super(MountedCuckooDrive, self).__init__(path, remotes, **kwargs)
+        self.mount()
 
-    @staticmethod
-    def exists(cuckoo_path):
-        path = os.path.join(cuckoo_path, ".cuckoodrive.yml")
-        return os.path.exists(path)
-
-    @staticmethod
-    def init(cuckoo_path):
-        """
-        Initialize a new cuckoo drive in the current folder.
-        This will create a .cuckoo.yml file where the configuration is stored.
-        """
-        path = os.path.join(cuckoo_path, ".cuckoodrive.yml")
-        template = {
-            "include": ["*"],
-            "exclude": [".cuckoodrive.yml"],
-            "remotes": {}
-        }
-        with open(path, mode="w") as fh:
-            yaml.safe_dump(template, fh)
-
-    def sync(self):
-        """
-        Synchronizes the current cuckoo drive directly with the remote filesystems.
-        """
-        pass
-
-    def _check_empty(self):
-        """Check whether the cuckoo drive directory is empty apart from the config file"""
-        entries = os.listdir(os.path.dirname(self.path))
-        return len(entries) <= 1
-
-    def mount(self, verbose=False):
+    def mount(self):
         """
         Mount the remote filesystems as a FUSE or Dokan filesystem.
         This allows you to use cuckoo drive exactly for your purposes.
         """
-        skip_methods = ('listdir', 'listdirinfo', 'getinfo', 'exists', 'isfile', 'getsize')
-        if not self._check_empty():
-            raise NotEmptyError("The cucko drive at {0} is not empty"
-                                .format(os.path.dirname(self.path)))
+        def verbose_fs(wrapped_fs, identifier):
+            if self.verbose:
+                return DebugFS(wrapped_fs, identifier=identifier,
+                               skip=self.skip_methods, verbose=False)
+            return wrapped_fs
 
-        multifs = WritableMultiFS()
-        if verbose:
-            multifs = DebugFS(multifs, identifier="MultiFS", skip=skip_methods, verbose=False)
+        multifs = verbose_fs(WritableMultiFS(), "MultiFS")
 
-        for name, fs_uri in self.configuration["remotes"].items():
-            remote_fs = fsopendir(fs_uri)
-            if verbose:
-                remote_fs = DebugFS(remote_fs, identifier="Remote@" + name,
-                                    skip=skip_methods, verbose=False)
-            multifs.addfs(name, remote_fs)
+        for fs_uri in self.remotes:
+            print(fs_uri)
+            remote_fs = verbose_fs(fsopendir(fs_uri), "Remote@{0}".format(fs_uri))
+            multifs.addfs(fs_uri, remote_fs)
 
-        partedfs = PartedFS(multifs, mb(2))
-        if verbose:
-            partedfs = DebugFS(partedfs, identifier="PartedFS", skip=skip_methods, verbose=False)
+        partedfs = verbose_fs(PartedFS(multifs, self.file_size), "PartedFS")
 
         try:
-            mp = fuse.mount(partedfs, self.path, nonempty=True)
+            mp = fuse.mount(partedfs, self.path)
             print("Mounted cuckoo drive at " + mp.path)
             print("Press any key to unmount")
             raw_input()
@@ -143,60 +85,28 @@ class CuckooDrive:
             print("Failed mounting cuckoo drive")
             raise
 
-    def add_remote(self, name, fs_uri):
-        """
-        Add a remote filesystem to the configuration file after successful authentication.
-        """
-        self.configuration["remotes"][name] = fs_uri
-        with open(self.path, mode="w") as fh:
-            yaml.safe_dump(self.configuration, fh)
 
-    def remove_remote(self, name):
-        """
-        Remove the remote filesystem
-        """
-        self.configuration["remotes"].pop(name)
-        with open(self.path, mode="w") as fh:
-            yaml.safe_dump(self.configuration, fh)
+class SyncedCuckooDrive(CuckooDrive):
 
-    def status(self):
+    def sync(self):
         """
-        Print the status of the chosen cuckoo drive.
+        Synchronizes the current cuckoo drive directly with the remote filesystems.
         """
-        print("On cuckoo drive {0}".format(self.path))
-        for name, fs in self.configuration["remotes"].items():
-            print("\t {0} at {1}".format(name, fs))
+        pass
 
 
 def main(arguments):
     print(arguments)
     path = os.getcwd()
-
-    if arguments["init"]:
-        if CuckooDrive.exists(path):
-            sys.exit("Path has already been initialized")
-        CuckooDrive.init(path)
-
-    if not CuckooDrive.exists(path):
-        sys.exit("This folder is not a cuckoo drive. Use cuckoo init to create a cuckoo drive")
-
-    cuckoodrive = CuckooDrive(path)
-
-    if arguments["status"]:
-        cuckoodrive.status()
-
-    if arguments["remote"]:
-        if arguments["add"]:
-            cuckoodrive.add_remote(arguments["<name>"], arguments["<fs_uri>"])
-
-        if arguments["remove"]:
-            cuckoodrive.remove_remote(arguments["<name>"])
+    verbose = arguments["--verbose"]
+    remotes = arguments["<fs_uri>"]
 
     if arguments["mount"]:
-        try:
-            cuckoodrive.mount(verbose=arguments["--verbose"])
-        except NotEmptyError as e:
-            print(e.message)
+        MountedCuckooDrive(path, remotes, verbose=verbose)
+
+    if arguments["sync"]:
+        SyncedCuckooDrive(path, remotes, verbose=verbose)
+
 
 if __name__ == "__main__":
     arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
