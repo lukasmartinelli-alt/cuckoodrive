@@ -56,10 +56,15 @@ import yaml
 
 from fs.expose import fuse
 from fs.opener import fsopendir
+from fs.wrapfs.debugfs import DebugFS
 
 from cuckoodrive.multifs import WritableMultiFS
 from cuckoodrive.partedfs import PartedFS
 from cuckoodrive.utils import mb
+
+
+class NotEmptyError(Exception):
+    pass
 
 
 class CuckooDrive:
@@ -97,19 +102,38 @@ class CuckooDrive:
         """
         pass
 
-    def mount(self):
+    def _check_empty(self):
+        """Check whether the cuckoo drive directory is empty apart from the config file"""
+        entries = os.listdir(os.path.dirname(self.path))
+        return len(entries) <= 1
+
+    def mount(self, verbose=False):
         """
         Mount the remote filesystems as a FUSE or Dokan filesystem.
         This allows you to use cuckoo drive exactly for your purposes.
         """
+        skip_methods = ('listdir', 'listdirinfo', 'getinfo', 'exists', 'isfile', 'getsize')
+        if not self._check_empty():
+            raise NotEmptyError("The cucko drive at {0} is not empty"
+                                .format(os.path.dirname(self.path)))
+
         multifs = WritableMultiFS()
+        if verbose:
+            multifs = DebugFS(multifs, identifier="MultiFS", skip=skip_methods, verbose=False)
+
         for name, fs_uri in self.configuration["remotes"].items():
             remote_fs = fsopendir(fs_uri)
+            if verbose:
+                remote_fs = DebugFS(remote_fs, identifier="Remote@" + name,
+                                    skip=skip_methods, verbose=False)
             multifs.addfs(name, remote_fs)
+
         partedfs = PartedFS(multifs, mb(2))
+        if verbose:
+            partedfs = DebugFS(partedfs, identifier="PartedFS", skip=skip_methods, verbose=False)
 
         try:
-            mp = fuse.mount(partedfs, self.path)
+            mp = fuse.mount(partedfs, self.path, nonempty=True)
             print("Mounted cuckoo drive at " + mp.path)
             print("Press any key to unmount")
             raw_input()
@@ -169,9 +193,10 @@ def main(arguments):
             cuckoodrive.remove_remote(arguments["<name>"])
 
     if arguments["mount"]:
-        path = arguments["<path>"]
-        cuckoodrive.mount()
-
+        try:
+            cuckoodrive.mount(verbose=arguments["--verbose"])
+        except NotEmptyError as e:
+            print(e.message)
 
 if __name__ == "__main__":
     arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
