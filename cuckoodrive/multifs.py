@@ -92,3 +92,9 @@ class WritableMultiFS(MultiFS):
         if not self.isdir(path):
             raise ResourceInvalidError(path)
         return super(WritableMultiFS, self).listdir(path, *args, **kwargs)
+
+    def settimes(self, path, accessed_time=None, modified_time=None):
+        """Set access and modify time on all filesystems that contain the the file"""
+        affected_filesystems = [fs for fs in self if fs.exists(path)]
+        for fs in affected_filesystems:
+            fs.settimes(path, accessed_time, modified_time)
