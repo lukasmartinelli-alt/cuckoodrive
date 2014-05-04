@@ -38,7 +38,13 @@ def main(arguments):
     remotes = arguments["<fs_uri>"]
 
     if arguments["mount"]:
-        MountedCuckooDrive(path, remotes, verbose=verbose)
+        drive = MountedCuckooDrive(path, remotes, verbose=verbose)
+        drive.mount()
+        print("Mounted cuckoo drive at " + path)
+        print("Press any key to unmount")
+        raw_input()
+        print("Unmounting cuckoo drive")
+        drive.unmount()
 
     if arguments["sync"]:
         SyncedCuckooDrive(path, remotes, verbose=verbose)

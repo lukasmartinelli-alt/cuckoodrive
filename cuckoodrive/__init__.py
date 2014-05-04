@@ -60,7 +60,6 @@ class CuckooDrive(object):
 class MountedCuckooDrive(CuckooDrive):
     def __init__(self, path, remote_uris, **kwargs):
         super(MountedCuckooDrive, self).__init__(path, remote_uris, **kwargs)
-        self.mount()
 
     def mount(self):
         """
@@ -68,14 +67,16 @@ class MountedCuckooDrive(CuckooDrive):
         This allows you to use cuckoo drive exactly for your purposes.
         """
         try:
-            mp = fuse.mount(self.remotefs, self.path)
-            print("Mounted cuckoo drive at " + mp.path)
-            print("Press any key to unmount")
-            raw_input()
-            print("Unmounting cuckoo drive")
-            mp.unmount()
+            self.mp = fuse.mount(self.remotefs, self.path)
         except RuntimeError:
             print("Failed mounting cuckoo drive")
+            raise
+
+    def unmount(self):
+        try:
+            self.mp.unmount()
+        except RuntimeError:
+            print("Failed unmounting cuckoo drive")
             raise
 
 
