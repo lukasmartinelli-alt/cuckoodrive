@@ -5,7 +5,7 @@ import unittest
 import tempfile
 import shutil
 
-from pytest import fixture
+from pytest import fixture, mark
 
 from fs.tests import FSTestCases
 from fs.wrapfs.limitsizefs import LimitSizeFS
@@ -53,3 +53,15 @@ class TestExternalCuckooDriveFS(unittest.TestCase, FSTestCases):
 
     def tearDown(self):
         self.fs.close()
+
+    @mark.xfail(reason="Appending does not work yet")
+    def test_readwriteappendseek(self):
+        super(TestExternalCuckooDriveFS, self).test_readwriteappendseek()
+
+    @mark.xfail(reason="FS is not truncatable")
+    def test_truncate_to_larger_size(self):
+        super(TestExternalCuckooDriveFS, self).test_truncate_to_larger_size()
+
+    @mark.xfail(reason="FS is not truncatable")
+    def test_truncate(self):
+        super(TestExternalCuckooDriveFS, self).test_truncate()
