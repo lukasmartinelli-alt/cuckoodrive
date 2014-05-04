@@ -27,22 +27,6 @@ class TestExternalPartedFS(unittest.TestCase, FSTestCases):
     def test_readwriteappendseek(self):
         super(TestExternalPartedFS, self).test_readwriteappendseek()
 
-    @mark.xfail(reason="FS does not support getcontents and setcontents yet")
-    def test_copydir(self):
-        super(TestExternalPartedFS, self).test_copydir()
-
-    @mark.xfail(reason="FS does not support getcontents and setcontents yet")
-    def test_copydir_with_dotfile(self):
-        super(TestExternalPartedFS, self).test_copydir_with_dotfile()
-
-    @mark.xfail(reason="FS does not support getcontents and setcontents yet")
-    def test_copyfile(self):
-        super(TestExternalPartedFS, self).test_copyfile()
-
-    @mark.xfail(reason="FS does not support getcontents and setcontents yet")
-    def test_movefile(self):
-        super(TestExternalPartedFS, self).test_movefile()
-
     @mark.xfail(reason="FS is not truncatable")
     def test_truncate_to_larger_size(self):
         super(TestExternalPartedFS, self).test_truncate_to_larger_size()
@@ -128,10 +112,9 @@ class TestPartedFS(object):
         # Act
         fs.remove("backup.tar")
         # Assert
-        fs.wrapped_fs.remove.assert_has_calls([
-                                                  call("backup.tar.part0"),
-                                                  call("backup.tar.part1"),
-                                                  call("backup.tar.part2")], any_order=True)
+        fs.wrapped_fs.remove.assert_has_calls([call("backup.tar.part0"),
+                                              call("backup.tar.part1"),
+                                              call("backup.tar.part2")], any_order=True)
 
     def test_listdir_returns_only_directories(self, fs_with_folder_structure):
         # Act
@@ -229,6 +212,13 @@ class TestPartedFS(object):
         # Assert
         created_parts = [part.name for part in f.parts]
         assert created_parts == ["backup.tar.part0", "backup.tar.part1", "backup.tar.part2"]
+
+    def test_open_file_in_directory_returns_file(self, fs):
+        # Arrange
+        fs.wrapped_fs.makedir("foo/bar", recursive=True)
+        fs.setcontents("foo/bar/backup.tar", urandom(kb(4)))
+        # Act
+        assert fs.getsize("foo/bar/backup.tar") == kb(4)
 
     def test_rename_raises_error_if_not_exists(self, fs):
         # Act & Assert
@@ -368,6 +358,21 @@ class TestPartedFS(object):
             call("backup.tar.part0", "copy_folder/backup.tar.part0"),
             call("backup.tar.part1", "copy_folder/backup.tar.part1")], any_order=True)
 
+    def test_setcontents_creates_file(self, fs):
+        # Act
+        fs.setcontents("backup.tar", urandom(kb(6)))
+        # Assert
+        assert fs.getsize("backup.tar") == kb(6)
+
+    def test_getcontents_reads_file(self, fs):
+        # Arrange
+        data = urandom(kb(6))
+        fs.setcontents("backup.tar", data)
+        # Act
+        saved_data = fs.getcontents("backup.tar")
+        # Assert
+        assert saved_data == data
+
 
 class TestPartedFile(object):
     @fixture
@@ -375,8 +380,7 @@ class TestPartedFile(object):
         fs = MemoryFS()
         mode = "wb+"
         path = "cuckoo.tar"
-        parts = [FilePart(fs.open("cuckoo.tar.part0", mode)),
-                (fs.open("cuckoo.tar.part1", mode))]
+        parts = [FilePart(fs.open("cuckoo.tar.part0", mode)), (fs.open("cuckoo.tar.part1", mode))]
         return PartedFile(path=path, mode=mode, fs=fs, max_part_size=kb(4), parts=parts)
 
     def test_current_part_returns_first_part_when_file_pointer_is_zero(self, parted_file):

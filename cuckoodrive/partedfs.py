@@ -66,9 +66,10 @@ class PartedFS(WrapFS):
         """
         return splitext(path)[0]
 
-    def listparts(self, path, full=False, absolute=False):
+    def listparts(self, path, full=True, absolute=False):
         """
         Return all parts for a given path.
+        By default it will always return the full paths.
         :param path: Path to check for parts
         :returns list of paths of parts
         """
@@ -87,7 +88,7 @@ class PartedFS(WrapFS):
         if self.isdir(path):
             raise ResourceInvalidError(path)
 
-        for part in self.listparts(path, full=True):
+        for part in self.listparts(path):
             self.wrapped_fs.remove(part)
 
     def isdir(self, path):
@@ -103,7 +104,7 @@ class PartedFS(WrapFS):
         return self.wrapped_fs.movedir(src, dst, **kwds)
 
     def copydir(self, src, dst, **kwds):
-        return self.wrapped_fs.movedir(src, dst, **kwds)
+        return self.wrapped_fs.copydir(src, dst, **kwds)
 
     def listdir(self, path="", wildcard=None, full=False, absolute=False, dirs_only=False,
                 files_only=False):
@@ -203,7 +204,7 @@ class PartedFS(WrapFS):
         if self.isdir(src):
             self.wrapped_fs.rename(src, dst)
         else:
-            for idx, part in enumerate(sorted(self.listparts(src, full=True))):
+            for idx, part in enumerate(sorted(self.listparts(src))):
                 part_src = self._encode(self._decode(part), part_index=idx)
                 part_dst = self._encode(dst, part_index=idx)
                 self.wrapped_fs.rename(part_src, part_dst)
