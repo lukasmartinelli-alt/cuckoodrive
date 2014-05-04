@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from fs.errors import NoMetaError, ResourceNotFoundError, ResourceInvalidError
+from fs.errors import NoMetaError, ResourceNotFoundError, ResourceInvalidError, RemoveRootError
 from fs.multifs import MultiFS
+from fs.path import normpath
 
 
 def free_space(fs):
@@ -101,3 +102,21 @@ class WritableMultiFS(MultiFS):
         affected_filesystems = [fs for fs in self if fs.exists(path)]
         for fs in affected_filesystems:
             fs.settimes(path, accessed_time, modified_time)
+
+    def rename(self, src, dst):
+        """Rename file on all filesystems where it exists"""
+        affected_filesystems = [fs for fs in self if fs.exists(src)]
+        for fs in affected_filesystems:
+            fs.rename(src, dst)
+
+    def removedir(self, path, recursive=False, force=False):
+        if normpath(path) in ('', '/'):
+            raise RemoveRootError(path)
+
+        affected_filesystems = [fs for fs in self if fs.exists(path)]
+
+        if len(affected_filesystems) == 0:
+            raise ResourceNotFoundError(path)
+
+        for fs in affected_filesystems:
+            fs.removedir(path, recursive=recursive, force=force)
