@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
-from fs.errors import NoMetaError
 
+from fs.errors import NoMetaError, ResourceNotFoundError, ResourceInvalidError
 from fs.multifs import MultiFS
 
 
@@ -54,6 +54,9 @@ class WritableMultiFS(MultiFS):
         """Search the file and open it on the fileystem where it exists if read mode is specified.
         Otherwise the best writefs will be choosen and a file created.
         """
+        if self.isdir(path):
+            raise ResourceInvalidError(path)
+
         if 'r' in mode:
             for fs in self:
                 if fs.exists(path):
@@ -67,6 +70,25 @@ class WritableMultiFS(MultiFS):
 
     def remove(self, path):
         """Remove the file on all filesystems"""
-        for fs in self:
-            if fs.exists(path):
-                fs.remove(path)
+        if self.isdir(path):
+            raise ResourceInvalidError(path)
+
+        affected_filesystems = [fs for fs in self if fs.exists(path)]
+
+        if len(affected_filesystems) == 0:
+            raise ResourceNotFoundError(path)
+
+        for fs in affected_filesystems:
+            fs.remove(path)
+
+    def listdir(self, path="/", *args, **kwargs):
+        """
+        Default path has to be "/" and not "./" (like in the normal MultiFS implementation).
+        Otherwise the absolute paths look really weird
+        :raise ResourceNotFoundError: when given path does not exist
+        """
+        if not self.exists(path):
+            raise ResourceNotFoundError(path)
+        if not self.isdir(path):
+            raise ResourceInvalidError(path)
+        return super(WritableMultiFS, self).listdir(path, *args, **kwargs)

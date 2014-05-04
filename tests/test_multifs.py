@@ -5,7 +5,7 @@ from os import urandom
 
 import unittest
 from mock import Mock
-from pytest import fixture, raises, mark
+from pytest import fixture, raises
 
 from fs.tests import FSTestCases
 from fs.wrapfs.limitsizefs import LimitSizeFS
@@ -29,22 +29,6 @@ class TestExternalWritableMultiFS(unittest.TestCase, FSTestCases):
 
     def tearDown(self):
         self.fs.close()
-
-    @mark.xfail(reason="Combination of LimitSizeFS and MultiFS does not work properly")
-    def test_listdir(self):
-        super(TestExternalWritableMultiFS, self).test_listdir()
-
-    @mark.xfail(reason="Combination of LimitSizeFS and MultiFS does not work properly")
-    def test_listdirinfo(self):
-        super(TestExternalWritableMultiFS, self).test_listdirinfo()
-
-    @mark.xfail(reason="Combination of LimitSizeFS and MultiFS does not work properly")
-    def test_open_on_directory(self):
-        super(TestExternalWritableMultiFS, self).test_open_on_directory()
-
-    @mark.xfail(reason="Combination of LimitSizeFS and MultiFS does not work properly")
-    def test_remove(self):
-        super(TestExternalWritableMultiFS, self).test_remove()
 
 
 class TestWritableMultiFS(object):
