@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+CuckooDrive emulates a user filesystem that aggregates all the free space provided on various
+cloud storage providers into one big drive.
+
+Usage:
+  cuckoodrive (sync | mount [--fuse | --dokan]) [-v | --verbose] --remotes <fs_uri>...
+  cuckoodrive (-h | --help)
+  cuckoodrive --version
+
+Options:
+  -h --help     Show this screen.
+  --remotes     Filesystem URIs of remote filesystems
+  --version     Show version.
+  --fuse        Mount the filesystem using FUSE.
+  --dokan       Mount the filesystem using DOKAN
+  -v --verbose  Print all filesystem actions to stdout
+
+Example #1:
+  cuckoodrive sync --remotes dropbox://morgenkaffee  googledrive://morgenkaffe
+
+Example #2:
+  cuckoodrive mount --fuse --remotes googledrive://morgenkaffee
+"""
+from __future__ import print_function, division, absolute_import, unicode_literals
+import os
+
+from docopt import docopt
+
+from cuckoodrive import MountedCuckooDrive, SyncedCuckooDrive
+
+
+def main(arguments):
+    print(arguments)
+    path = os.getcwd()
+    verbose = arguments["--verbose"]
+    remotes = arguments["<fs_uri>"]
+
+    if arguments["mount"]:
+        MountedCuckooDrive(path, remotes, verbose=verbose)
+
+    if arguments["sync"]:
+        SyncedCuckooDrive(path, remotes, verbose=verbose)
+
+
+if __name__ == "__main__":
+    arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
+    main(arguments)
