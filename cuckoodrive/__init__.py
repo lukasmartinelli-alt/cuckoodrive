@@ -17,33 +17,38 @@ class CuckooDrive(object):
     skip_methods = ('listdir', 'listdirinfo', 'getinfo', 'exists', 'isfile', 'getsize')
     file_size = mb(10)
 
-    def __init__(self, path, remotes, verbose=False):
+    def __init__(self, path, remote_filesystems, verbose=False):
         self.path = path
         self.verbose = verbose
-        self.remotefs = self._remotefs(remotes)
+        self.remotefs = self._create_fs(remote_filesystems)
 
-    def _remotefs(self, remotes):
-        """Create a MultiFS of all the remote filesystems"""
-        def verbose_fs(wrapped_fs, identifier):
-            if self.verbose:
-                return DebugFS(wrapped_fs, identifier=identifier,
-                               skip=self.skip_methods, verbose=False)
-            return wrapped_fs
+    @staticmethod
+    def create_remote_filesystems_from_uris(remote_uris, verbose):
+        """Create remote filesystem for each given uri and return them"""
+        for idx, fs_uri in enumerate(remote_uris):
+            yield CuckooDrive.verbose_fs(fsopendir(fs_uri), "Remote{0}".format(idx), verbose)
 
-        multifs = verbose_fs(WritableMultiFS(), "MultiFS")
+    @staticmethod
+    def verbose_fs(wrapped_fs, identifier, verbose):
+        """Wrap the filesystem into a DebugFS if the verbose option is specified"""
+        if verbose:
+            return DebugFS(wrapped_fs, identifier=identifier,
+                           skip=CuckooDrive.skip_methods, verbose=False)
+        return wrapped_fs
 
-        for fs_uri in remotes:
-            print(fs_uri)
-            remote_fs = verbose_fs(fsopendir(fs_uri), "Remote@{0}".format(fs_uri))
-            multifs.addfs(fs_uri, remote_fs)
+    def _create_fs(self, remote_filesystems):
+        """Create the cuckoo drive fileystem out of the remote filesystems"""
+        multifs = CuckooDrive.verbose_fs(WritableMultiFS(), "MultiFS", self.verbose)
+        for idx, remote_fs in enumerate(remote_filesystems):
+            multifs.addfs("Remote{0}".format(idx), remote_fs)
 
-        partedfs = verbose_fs(PartedFS(multifs, self.file_size), "PartedFS")
-        return partedfs
+        return CuckooDrive.verbose_fs(PartedFS(multifs, self.file_size), "PartedFS", self.verbose)
 
 
 class MountedCuckooDrive(CuckooDrive):
-    def __init__(self, path, remotes, **kwargs):
-        super(MountedCuckooDrive, self).__init__(path, remotes, **kwargs)
+    def __init__(self, path, remotes, verbose=False):
+        remote_filesystems = CuckooDrive.create_remote_filesystems_from_uris(remotes, verbose)
+        super(MountedCuckooDrive, self).__init__(path, remote_filesystems, verbose)
         self.mount()
 
     def mount(self):
@@ -64,8 +69,9 @@ class MountedCuckooDrive(CuckooDrive):
 
 
 class SyncedCuckooDrive(CuckooDrive):
-    def __init__(self, path, remotes, **kwargs):
-        super(SyncedCuckooDrive, self).__init__(path, remotes, **kwargs)
+    def __init__(self, path, remotes, verbose=False):
+        remote_filesystems = CuckooDrive.create_remote_filesystems_from_uris(remotes, verbose)
+        super(SyncedCuckooDrive, self).__init__(path, remote_filesystems, verbose)
         self.fs = OSFS(path)
         self.sync_dirs()
         self.sync_files()
