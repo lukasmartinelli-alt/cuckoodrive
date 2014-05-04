@@ -64,6 +64,9 @@ class WritableMultiFS(MultiFS):
                                    errors=errors, newline=newline, line_buffering=line_buffering,
                                    **kwargs)
 
+        if 'w' in mode and not '+' in mode and self.exists(path):
+            self.remove(path)
+
         return super(WritableMultiFS, self).open(path, mode=mode, buffering=buffering,
                                                  encoding=encoding, errors=errors, newline=newline,
                                                  line_buffering=line_buffering, **kwargs)
