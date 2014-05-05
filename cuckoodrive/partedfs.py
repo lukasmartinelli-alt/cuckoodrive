@@ -4,7 +4,7 @@ import fnmatch
 import re
 import stat
 
-from fs.errors import ResourceNotFoundError, ResourceInvalidError
+from fs.errors import ResourceNotFoundError, ResourceInvalidError, NoSysPathError
 from fs.filelike import FileLikeBase, FileWrapper
 from fs.path import dirname, basename, splitext, pathcombine, abspath
 from fs.wrapfs import WrapFS, wrap_fs_methods, rewrite_errors
@@ -187,7 +187,8 @@ class PartedFS(WrapFS):
                                   max_part_size=self.max_part_size, parts=parts)
             else:
                 raise ResourceNotFoundError(path)
-        if "w" in mode and self.exists(path):
+
+        if 'w' in mode and not '+' in mode and self.exists(path):
             self.remove(path)
 
         return PartedFile(fs=self.wrapped_fs, path=path, mode=mode,
@@ -293,6 +294,12 @@ class PartedFS(WrapFS):
         if not self.exists(path):
             raise ResourceNotFoundError(path)
         return sum([self.wrapped_fs.getsize(part) for part in self.listparts(path)])
+
+    def getsyspath(self, path, allow_none=False):
+        """Because the file is split into two parts we cannot provide a syspath"""
+        if not allow_none:
+            raise NoSysPathError(path=path)
+        return None
 
 
 class PartSizeExceeded(Exception):

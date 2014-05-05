@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-from fs.errors import NoMetaError, ResourceNotFoundError, ResourceInvalidError, RemoveRootError
+from fs.errors import (NoMetaError, ResourceNotFoundError, ResourceInvalidError,
+                       RemoveRootError, NoSysPathError)
 from fs.multifs import MultiFS
 from fs.path import normpath
 
@@ -120,3 +121,12 @@ class WritableMultiFS(MultiFS):
 
         for fs in affected_filesystems:
             fs.removedir(path, recursive=recursive, force=force)
+
+    def getsyspath(self, path, allow_none=False):
+        """
+        Because the file might be at severall different locations at the same time
+        we cannot provide a unique syspath
+        """
+        if not allow_none:
+            raise NoSysPathError(path=path)
+        return None
