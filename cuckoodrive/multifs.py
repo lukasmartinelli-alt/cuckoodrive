@@ -130,3 +130,7 @@ class WritableMultiFS(MultiFS):
         if not allow_none:
             raise NoSysPathError(path=path)
         return None
+
+    def makedir(self, path, **kwargs):
+        for fs in self:
+            fs.makedir(path, **kwargs)

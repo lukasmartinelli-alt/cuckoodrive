@@ -54,14 +54,6 @@ class TestExternalCuckooDriveFS(unittest.TestCase, FSTestCases):
     def tearDown(self):
         self.fs.close()
 
-    # @mark.xfail(reason="A weird bug for another day perhaps caused by MemoryFS")
-    def test_movedir(self):
-        super(TestExternalCuckooDriveFS, self).test_movedir()
-
-    # @mark.xfail(reason="A weird bug for another day perhaps caused by MemoryFS")
-    def test_movefile(self):
-        super(TestExternalCuckooDriveFS, self).test_movefile()
-
     @mark.xfail(reason="Appending does not work yet")
     def test_readwriteappendseek(self):
         super(TestExternalCuckooDriveFS, self).test_readwriteappendseek()
