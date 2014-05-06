@@ -17,27 +17,21 @@ The current FUSE implementation doesn't play well with Python 3.
 Platform        py27   py34    pypy
 =============   =====  ======  ======
 Unix (FUSE)     Yes    No      Yes
-OSX (OSXFUSE)   Yes    Yes     Yes 
-Win (Dokan)     Yes    Yes     Yes 
+OSX (OSXFUSE)   Yes    Yes     Yes
+Win (Dokan)     Yes    Yes     Yes
 =============   =====  ======  ======
 
 
 Development
 -----------
-The test suite depends on ``tox`` to test all the supported Python versions::
-
-    pip install tox pytest
+CuckooDrive is written for CPython 2.7 because this is the version `PyFilesystem <http://www.python.org/>`_. works best. Nonetheless we try to write Python that is compatible with Python 3.4 and PyPy as well.
 
 Setup Environment:
 
 1. clone repository
-2. ``pip install tox``
-3. ``pip install -e .``
+2. setup virtual environment
+3. ``python setup.py develop``
 
-Run the tests for all supported Python versions::
+Run the unit tests::
 
-    tox
-
-Run the tests for a specific Python version (e.g. Python 2.7)::
-
-    tox -e py27
+    python setup.py test
