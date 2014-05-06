@@ -4,6 +4,7 @@ from __future__ import print_function, division, absolute_import, unicode_litera
 import unittest
 import tempfile
 import shutil
+import os
 
 from pytest import fixture, mark
 
@@ -17,12 +18,14 @@ from cuckoodrive.utils import mb
 
 
 class TestMountedCuckooDrive(object):
+    """Tests of this kind could be used as benchmarks"""
     @fixture
     def mount_drive(self, request):
         fs1_dir = tempfile.mkdtemp()
         fs2_dir = tempfile.mkdtemp()
 
         drive = MountedCuckooDrive(path=tempfile.mkdtemp(), remote_uris=[fs1_dir, fs2_dir])
+        drive.mount()
 
         def cleanup():
             drive.unmount()
@@ -34,15 +37,39 @@ class TestMountedCuckooDrive(object):
         return drive
 
     @fixture
+    def mounted_fs(self, mount_drive):
+        return OSFS(mount_drive.path)
+
+    @fixture
     def user_fs(self, request):
         user_dir = tempfile.mkdtemp()
 
         fs = OSFS(user_dir)
-        request.addfinalizer(lambda: shutil.user_dir)
+        request.addfinalizer(lambda: shutil.rmtree(user_dir))
         return fs
 
-    def test_copy_large_file(self):
-        pass
+    def test_copy_large_file(self, user_fs, mounted_fs):
+        # Arrange
+        data = os.urandom(mb(43))
+        user_fs.setcontents("backup.tar", data)
+        src = user_fs.getsyspath("backup.tar")
+        dst = os.path.join(mounted_fs.root_path, "backup.tar")
+        # Act
+        shutil.copyfile(src, dst)
+        # Assert
+        assert data == mounted_fs.getcontents("backup.tar")
+
+
+class TestCuckooDriveFS(object):
+    @fixture
+    def fs(self, request):
+        fs1 = LimitSizeFS(MemoryFS(), mb(300))
+        fs2 = LimitSizeFS(MemoryFS(), mb(300))
+        fs = CuckooDriveFS([fs1, fs2])
+        request.addfinalizer(lambda: fs.close())
+        return fs
+
+    # Special integration tests
 
 
 class TestExternalCuckooDriveFS(unittest.TestCase, FSTestCases):
