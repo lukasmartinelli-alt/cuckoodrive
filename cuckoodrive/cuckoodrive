@@ -5,16 +5,14 @@ CuckooDrive emulates a user filesystem that aggregates all the free space provid
 cloud storage providers into one big drive.
 
 Usage:
-  cuckoodrive (sync | mount [--fuse | --dokan]) [-v | --verbose] --remotes <fs_uri>...
+  cuckoodrive sync [-v | --verbose] --remotes <fs_uri>...
   cuckoodrive (-h | --help)
   cuckoodrive --version
 
 Options:
   -h --help     Show this screen.
   --remotes     Filesystem URIs of remote filesystems
-  --version     Show version.
-  --fuse        Mount the filesystem using FUSE.
-  --dokan       Mount the filesystem using DOKAN
+  --version     Show version
   -v --verbose  Print all filesystem actions to stdout
 
 Example #1:
@@ -28,7 +26,7 @@ import os
 
 from docopt import docopt
 
-from cuckoodrive import MountedCuckooDrive, SyncedCuckooDrive
+from cuckoodrive import SyncedCuckooDrive
 
 
 def main(arguments):
@@ -36,15 +34,6 @@ def main(arguments):
     path = os.getcwd()
     verbose = arguments["--verbose"]
     remotes = arguments["<fs_uri>"]
-
-    if arguments["mount"]:
-        drive = MountedCuckooDrive(path, remotes, verbose=verbose)
-        drive.mount()
-        print("Mounted cuckoo drive at " + path)
-        print("Press any key to unmount")
-        raw_input()
-        print("Unmounting cuckoo drive")
-        drive.unmount()
 
     if arguments["sync"]:
         SyncedCuckooDrive(path, remotes, verbose=verbose)

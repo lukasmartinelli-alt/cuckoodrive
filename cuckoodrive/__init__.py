@@ -57,29 +57,6 @@ class CuckooDrive(object):
         self.remotefs = CuckooDriveFS.from_uris(remote_uris, verbose=verbose)
 
 
-class MountedCuckooDrive(CuckooDrive):
-    def __init__(self, path, remote_uris, **kwargs):
-        super(MountedCuckooDrive, self).__init__(path, remote_uris, **kwargs)
-
-    def mount(self):
-        """
-        Mount the remote filesystems as a FUSE or Dokan filesystem.
-        This allows you to use cuckoo drive exactly for your purposes.
-        """
-        try:
-            self.mp = fuse.mount(self.remotefs, self.path)
-        except RuntimeError:
-            print("Failed mounting cuckoo drive")
-            raise
-
-    def unmount(self):
-        try:
-            self.mp.unmount()
-        except RuntimeError:
-            print("Failed unmounting cuckoo drive")
-            raise
-
-
 class SyncedCuckooDrive(CuckooDrive):
     def __init__(self, path, remote_uris, **kwargs):
         super(SyncedCuckooDrive, self).__init__(path, remote_uris, **kwargs)
