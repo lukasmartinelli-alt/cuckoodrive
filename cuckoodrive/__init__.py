@@ -31,6 +31,7 @@ from fs.osfs import OSFS
 from fs.utils import copyfile, copydir
 from fs.wrapfs import WrapFS
 
+from cuckoodrive.filelock import FileLock
 from cuckoodrive.multifs import WritableMultiFS
 from cuckoodrive.partedfs import PartedFS
 from cuckoodrive.utils import mb
@@ -114,24 +115,42 @@ class CuckooDrive(object):
 class SyncedCuckooDrive(CuckooDrive):
     """
     Watches and synchronizes a local path with the remote_fs.
+    CuckooDrive doesn't try to do automatic conflict resolution. We can ensure that conflicts don't
+    happen from our side by locking the entire filesystem with a FileLock.
+    We assume that only one instance of CuckooDrive is manipulating the storages and no 3rd party
+    applications mess with the .part files of CuckooDrive.
     """
     def __init__(self, path, remote_uris, **kwargs):
         super(SyncedCuckooDrive, self).__init__(path, remote_uris, **kwargs)
-        self.fs = OSFS(path)
-        self.sync_dirs()
-        self.sync_files()
+        self.userfs = OSFS(path)
+
+        with FileLock(self.remotefs):
+            self.sync_dirs()
+            self.sync_files()
 
     def sync_dirs(self):
-        for path in self.fs.walkdirs():
+        """
+        Copies directories to CuckooDrive if they only exist on the user side
+        """
+        for path in self.userfs.walkdirs():
             if not self.remotefs.exists(path):
-                copydir((self.fs, path), (self.remotefs, path))
+                copydir((self.userfs, path), (self.remotefs, path))
 
     def sync_files(self):
-        for path in self.fs.walkfiles():
+        """
+        Copies the file to CuckooDrive if it only exists on the user side.
+        If the file exists we try to see whether it changed by calculating the hashes of the local
+        and external file. If the external file is older we can overwrite it safely. If however
+        the external file is newer we don't try to resolve this file conflict but just save
+        the user file as a conflicted copy.
+        """
+        for path in self.userfs.walkfiles():
             if self.remotefs.exists(path):
-                self.remotefs
+                # Compare hashes or sizes
+                # Comparing dates
+                pass
             else:
-                copyfile(self.fs, path, self.remotefs, path)
+                copyfile(self.userfs, path, self.remotefs, path)
 
 
 def main():
