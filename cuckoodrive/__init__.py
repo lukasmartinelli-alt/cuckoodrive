@@ -37,6 +37,34 @@ from cuckoodrive.utils import mb
 
 
 class CuckooDriveFS(WrapFS):
+    """This filesystem is used in CuckooDrive an basically encapsulates a PartedFS on top of
+    a WritableMultiFS containg the custom cloud provider filesystems.
+
+    The Filesystem stack usually looks something like this:
+
+    +------------+------------+-----------+
+    |               PartedFS              |
+    +------------+------------+-----------+
+    |            WritableMultiFS          |
+    +------------+------------+-----------+
+    | DropboxFS  | OneDriveFS | RemoteFS  |
+    +------------+------------+-----------+
+
+    You can aggregate every custom PyFilesystem you want. For testing we often use OSFS instances::
+        fs = CuckooDriveFS(remote_filesystems=[OSFS('/tmp/fs1'), OSFS('/tmp/fs2')])
+
+    You can also use the filesystem URI syntax to create a CuckooDriveFS::
+        fs = CuckooDriveFS.from_uris(remote_uris=['/tmp/fs1', '/tmp/fs1'])
+
+    This works for all filesystem that have an Opener implemented::
+        fs = CuckooDriveFS.from_uris(remote_uris=['dropbox://morgenkaffee/cuckoo'])
+
+    When the verbose option is specified, each filesystem is wrapped in a DebugFS that logs
+    every action.
+
+    Manipulate the maximum file_size of a PartFile of the PartedFS::
+        CuckooDriveFS.file_size = mb(40)
+    """
     skip_methods = ('listdir', 'listdirinfo', 'getinfo', 'exists', 'isfile', 'getsize')
     file_size = mb(10)
 
@@ -64,7 +92,7 @@ class CuckooDriveFS(WrapFS):
         return wrapped_fs
 
     @classmethod
-    def from_uris(cls, remote_uris, verbose):
+    def from_uris(cls, remote_uris, verbose=False):
         """Create remote filesystem for each given uri and return them"""
         def create_fs(idx, fs_uri):
             return CuckooDriveFS.verbose_fs(fsopendir(fs_uri), "Remote{0}".format(idx), verbose)
@@ -74,13 +102,19 @@ class CuckooDriveFS(WrapFS):
 
 
 class CuckooDrive(object):
-    """Represents a cuckoo drive either in mounted or in synchronized mode."""
+    """
+    Represents a basic cuckoo drive that is associated with a local path.
+    The underlying CuckooDriveFS is initialized from the passed remote_uris.
+    """
     def __init__(self, path, remote_uris, verbose=False):
         self.path = path
         self.remotefs = CuckooDriveFS.from_uris(remote_uris, verbose=verbose)
 
 
 class SyncedCuckooDrive(CuckooDrive):
+    """
+    Watches and synchronizes a local path with the remote_fs.
+    """
     def __init__(self, path, remote_uris, **kwargs):
         super(SyncedCuckooDrive, self).__init__(path, remote_uris, **kwargs)
         self.fs = OSFS(path)
@@ -102,7 +136,6 @@ class SyncedCuckooDrive(CuckooDrive):
 
 def main():
     arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
-    print(arguments)
     path = os.getcwd()
     verbose = arguments["--verbose"]
     remotes = arguments["<fs_uri>"]
