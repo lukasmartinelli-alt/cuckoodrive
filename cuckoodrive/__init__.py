@@ -1,7 +1,30 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function, division, absolute_import, unicode_literals
+"""
+CuckooDrive emulates a user filesystem that aggregates all the free space provided on various
+cloud storage providers into one big drive.
 
-from fs.expose import fuse
+Usage:
+  cuckoodrive sync [-v | --verbose] --remotes <fs_uri>...
+  cuckoodrive (-h | --help)
+  cuckoodrive --version
+
+Options:
+  -h --help     Show this screen.
+  --remotes     Filesystem URIs of remote filesystems
+  --version     Show version
+  -v --verbose  Print all filesystem actions to stdout
+
+Example #1:
+  cuckoodrive sync --remotes dropbox://morgenkaffee  googledrive://morgenkaffe
+
+Example #2:
+  cuckoodrive mount --fuse --remotes googledrive://morgenkaffee
+"""
+from __future__ import print_function, division, absolute_import, unicode_literals
+import os
+
+from docopt import docopt
+
 from fs.opener import fsopendir
 from fs.wrapfs.debugfs import DebugFS
 from fs.osfs import OSFS
@@ -75,3 +98,14 @@ class SyncedCuckooDrive(CuckooDrive):
                 self.remotefs
             else:
                 copyfile(self.fs, path, self.remotefs, path)
+
+
+def main():
+    arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
+    print(arguments)
+    path = os.getcwd()
+    verbose = arguments["--verbose"]
+    remotes = arguments["<fs_uri>"]
+
+    if arguments["sync"]:
+        SyncedCuckooDrive(path, remotes, verbose=verbose)

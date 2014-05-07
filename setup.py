@@ -48,5 +48,7 @@ setup(
     license='GPLv2',
     keywords = "fs dropbox",
     include_package_data=True,
-    scripts=['cuckoodrive/cuckoodrive']
+    entry_points = {
+        'console_scripts': ['cuckoodrive=cuckoodrive:main']
+    }
 )
