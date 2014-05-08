@@ -112,9 +112,10 @@ class SyncedCuckooDrive(object):
     Watches and synchronizes a local path with the remote_fs.
     The underlying CuckooDriveFS is initialized from the passed remote_uris.
     """
-    def __init__(self, userfs, remotefs, watch=False, verbose=False):
+    def __init__(self, userfs, remotefs, mode="update", watch=False, verbose=False):
         self.userfs = userfs
         self.remotefs = remotefs
+        self.mode = mode
 
         if watch:
             ensure_watchable(self.userfs)
@@ -152,13 +153,33 @@ class SyncedCuckooDrive(object):
         for path in self.userfs.walkdirs():
             if not self.remotefs.exists(path):
                 copydir((self.userfs, path), (self.remotefs, path))
+                print(term.green + ">>> " + "copied " + path + term.normal)
+
+    def has_conflict(self, src, dst):
+        src_info = self.userfs.getinfo(src)
+        dst_info = self.remotefs.getinfo(dst)
+        return src_info["modified_time"] < dst_info["modified_time"]
+
+    def patchfile(self, path):
+        """Patch remote file with new user file if size has changed"""
+        user_info = self.userfs.getinfo(path)
+        remote_info = self.remotefs.getinfo(path)
+
+        if user_info["size"] != remote_info["size"]:
+            copyfile(self.userfs, path, self.remotefs, path, overwrite=True)
+            print(term.yellow + ">>> " + "updated " + path + term.normal)
 
     def sync_files(self):
+        """Copy files that don't exist on remote fs or patch them if they do exist"""
+        if self.mode != "update":
+            raise NotImplementedError("Only the update mode has been implemented yet.")
+
         for path in self.userfs.walkfiles():
             if self.remotefs.exists(path):
-                self.remotefs
+                self.patchfile(path)
             else:
-                copyfile(self.userfs, path, self.remotefs, path)
+                copyfile(self.userfs, path, self.remotefs, path, overwrite=False)
+                print(term.green + ">>> " + "copied " + path + term.normal)
 
 
 def main():

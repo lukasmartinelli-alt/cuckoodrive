@@ -2,6 +2,7 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 
 from os import urandom
+from datetime import datetime, timedelta
 
 import unittest
 
@@ -109,7 +110,55 @@ class TestSyncedCuckooDrive(object):
         drive.sync_files()
         # Arrange
         assert drive.remotefs.exists("newfile.txt")
-        assert drive.remotefs.getsize("oldfile.txt") == kb(1)
+        assert drive.remotefs.getsize("oldfile.txt") == kb(2)
+
+    def test_has_conflict_returns_true_if_destination_is_newer(self, drive):
+        # Arrange
+        drive.userfs.setcontents("source.txt", urandom(kb(1)))
+        drive.userfs.settimes("source.txt", modified_time=datetime.today() - timedelta(days=1))
+
+        drive.remotefs.setcontents("dest.txt", urandom(kb(2)))
+        drive.remotefs.settimes("dest.txt", modified_time=datetime.today())
+        # Act
+        conflict = drive.has_conflict(src="source.txt", dst="dest.txt")
+        # Assert
+        assert conflict
+
+    def test_has_conflict_returns_false_if_source_is_newer(self, drive):
+        # Arrange
+        drive.userfs.setcontents("source.txt", urandom(kb(1)))
+        drive.userfs.settimes("source.txt", modified_time=datetime.today())
+
+        drive.remotefs.setcontents("dest.txt", urandom(kb(2)))
+        drive.remotefs.settimes("dest.txt", modified_time=datetime.today() - timedelta(days=1))
+        # Act
+        conflict = drive.has_conflict(src="source.txt", dst="dest.txt")
+        # Assert
+        assert not conflict
+
+    def test_patchfile_ignores_update_if_size_is_same(self, drive):
+        # Arrange
+        new_data = urandom(kb(1))
+        old_data = urandom(kb(1))
+
+        drive.userfs.setcontents("source.txt", new_data)
+        drive.remotefs.setcontents("source.txt", old_data)
+        # Act
+        drive.patchfile("source.txt")
+        # Assert
+        assert drive.remotefs.getcontents("source.txt") == old_data
+
+    def test_patchfile_updates_remote(self, drive):
+        # Arrange
+        new_data = urandom(kb(2))
+        old_data = urandom(kb(1))
+
+        drive.userfs.setcontents("source.txt", new_data)
+        drive.remotefs.setcontents("source.txt", old_data)
+        # Act
+        drive.patchfile("source.txt")
+        # Assert
+        assert drive.remotefs.getcontents("source.txt") == new_data
 
 
 class TestExternalCuckooDriveFS(unittest.TestCase, FSTestCases):
