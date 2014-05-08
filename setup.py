@@ -13,6 +13,8 @@ install_requires = [
     'fs',
     'dropbox',
     'docopt',
+    'pyinotify',
+    'blessings'
 ]
 
 
