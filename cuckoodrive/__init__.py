@@ -4,7 +4,7 @@ CuckooDrive emulates a user filesystem that aggregates all the free space provid
 cloud storage providers into one big drive.
 
 Usage:
-  cuckoodrive sync [-v | --verbose] --remotes <fs_uri>...
+  cuckoodrive sync [--watch] [-v | --verbose] --remotes <fs_uri>...
   cuckoodrive (-h | --help)
   cuckoodrive --version
 
@@ -12,13 +12,11 @@ Options:
   -h --help     Show this screen.
   --remotes     Filesystem URIs of remote filesystems
   --version     Show version
+  --watch       Watch path for changes and synchronize them automatically
   -v --verbose  Print all filesystem actions to stdout
 
 Example #1:
   cuckoodrive sync --remotes dropbox://morgenkaffee  googledrive://morgenkaffe
-
-Example #2:
-  cuckoodrive mount --fuse --remotes googledrive://morgenkaffee
 """
 from __future__ import print_function, division, absolute_import, unicode_literals
 import os
@@ -101,22 +99,14 @@ class CuckooDriveFS(WrapFS):
         return cls(remote_filesystems, verbose)
 
 
-class CuckooDrive(object):
-    """
-    Represents a basic cuckoo drive that is associated with a local path.
-    The underlying CuckooDriveFS is initialized from the passed remote_uris.
-    """
-    def __init__(self, path, remote_uris, verbose=False):
-        self.path = path
-        self.remotefs = CuckooDriveFS.from_uris(remote_uris, verbose=verbose)
-
-
-class SyncedCuckooDrive(CuckooDrive):
+class SyncedCuckooDrive(object):
     """
     Watches and synchronizes a local path with the remote_fs.
+    The underlying CuckooDriveFS is initialized from the passed remote_uris.
     """
-    def __init__(self, path, remote_uris, **kwargs):
-        super(SyncedCuckooDrive, self).__init__(path, remote_uris, **kwargs)
+    def __init__(self, path, remote_uris, watch=False, verbose=False):
+        self.path = path
+        self.remotefs = CuckooDriveFS.from_uris(remote_uris, verbose=verbose)
         self.fs = OSFS(path)
         self.sync_dirs()
         self.sync_files()
@@ -137,8 +127,9 @@ class SyncedCuckooDrive(CuckooDrive):
 def main():
     arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
     path = os.getcwd()
+    watch = arguments["--watch"]
     verbose = arguments["--verbose"]
     remotes = arguments["<fs_uri>"]
 
     if arguments["sync"]:
-        SyncedCuckooDrive(path, remotes, verbose=verbose)
+        SyncedCuckooDrive(path, remotes, watch=watch, verbose=verbose)
