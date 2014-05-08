@@ -112,10 +112,9 @@ class SyncedCuckooDrive(object):
     Watches and synchronizes a local path with the remote_fs.
     The underlying CuckooDriveFS is initialized from the passed remote_uris.
     """
-    def __init__(self, path, remote_uris, watch=False, verbose=False):
-        self.path = path
-        self.remotefs = CuckooDriveFS.from_uris(remote_uris, verbose=verbose)
-        self.userfs = OSFS(path)
+    def __init__(self, userfs, remotefs, watch=False, verbose=False):
+        self.userfs = userfs
+        self.remotefs = remotefs
 
         if watch:
             ensure_watchable(self.userfs)
@@ -125,24 +124,27 @@ class SyncedCuckooDrive(object):
             self.sync_dirs()
             self.sync_files()
 
+    @staticmethod
+    def create_event_message(event):
+        event_name = event.__class__.__name__.lower()
+        message = 4 * " " + event_name + " " + term.normal + event.path
+
+        if type(event) is fs.watch.CREATED:
+            return term.green + message
+        elif type(event) is fs.watch.MODIFIED:
+            return term.yellow + message
+        elif type(event) is fs.watch.REMOVED:
+            return term.red + message
+        elif type(event) in (fs.watch.MOVED_DST, fs.watch.MOVED_SRC):
+            return term.cyan + message
+        else:
+            return message
+
     def userfs_changed(self, event):
         ignored_events = (fs.watch.ACCESSED, fs.watch.CLOSED)
         if type(event) not in ignored_events:
-            event_name = event.__class__.__name__.lower()
-            message = 4 * " " + event_name + " " + term.normal + event.path
-
-            if type(event) is fs.watch.CREATED:
-                print(term.green + message)
-            elif type(event) is fs.watch.MODIFIED:
-                print(term.yellow + message)
-            elif type(event) is fs.watch.REMOVED:
-                print(term.red + message)
-            elif type(event) in (fs.watch.MOVED_DST, fs.watch.MOVED_SRC):
-                print(term.cyan + message)
-            else:
-                print(message)
-            # Handle specific events
-            # for now just resynchronize
+            message = self.create_event_message(event)
+            print(message)
             self.sync_dirs()
             self.sync_files()
 
@@ -164,7 +166,7 @@ def main():
     path = os.getcwd()
     watch = arguments["--watch"]
     verbose = arguments["--verbose"]
-    remotes = arguments["<fs_uri>"]
+    remote_uris = arguments["<fs_uri>"]
 
     def sync_aborted(signal, frame):
         print('Stopped synchronizing!')
@@ -174,9 +176,13 @@ def main():
         while True:
             continue
 
+    remotefs = CuckooDriveFS.from_uris(remote_uris, verbose=verbose)
+    userfs = OSFS(path)
+
     if arguments["sync"]:
         signal.signal(signal.SIGINT, sync_aborted)
-        SyncedCuckooDrive(path, remotes, watch=watch, verbose=verbose)
+        print("Synchronizing {0}".format(path))
+        SyncedCuckooDrive(userfs, remotefs, watch=watch, verbose=verbose)
         if watch:
             print(">>> CuckooDrive is watching for changes. Press Ctrl-C to Stop.")
             wait_abort()
