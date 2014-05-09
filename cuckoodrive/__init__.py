@@ -190,7 +190,6 @@ class SyncedCuckooDrive(object):
 class CuckooDropboxOpener(DropboxOpener):
     @staticmethod
     def get_options(username):
-        # import ipdb; ipdb.set_trace()
         options = {
             "app_key":"bhhdl31c1xlca9g",
             "app_secret":"kt8q37wti4i8by7",

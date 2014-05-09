@@ -270,9 +270,9 @@ class PartedFS(WrapFS):
             if len(part_infos) > 0:
                 info["parts"] = part_infos
                 info["size"] = self.getsize(path)
-                info["created_time"] = max([i["modified_time"] for i in part_infos])
-                info["modified_time"] = max([i["modified_time"] for i in part_infos])
-                info["accessed_time"] = max([i["accessed_time"] for i in part_infos])
+                info["created_time"] = max([i.get("created_time") for i in part_infos])
+                info["modified_time"] = max([i.get("modified_time") for i in part_infos])
+                info["accessed_time"] = max([i.get("accessed_time") for i in part_infos])
         else:
             info = self.wrapped_fs.getinfo(path)
 
