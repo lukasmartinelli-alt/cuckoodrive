@@ -11,10 +11,14 @@ tests_require = [
 
 install_requires = [
     'fs',
-    'dropbox',
+    'pyfs-dropbox',
     'docopt',
     'pyinotify',
     'blessings'
+]
+
+dependency_links= [
+    'https://github.com/lukasmartinelli/fs-dropbox/tarball/master#egg=pyfs-dropbox-0.3.3',
 ]
 
 
@@ -46,6 +50,7 @@ setup(
         'test': tests_require
     },
     tests_require=tests_require,
+    dependency_links=dependency_links,
     cmdclass={'test': PyTest},
     license='GPLv2',
     keywords = "fs dropbox",

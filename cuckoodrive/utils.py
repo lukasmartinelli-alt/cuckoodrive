@@ -15,4 +15,4 @@ def mb(value):
     """
     Helper method to return value in MB as values in Bytes
     """
-    return kb(value) * 1025
+    return kb(value) * 1024

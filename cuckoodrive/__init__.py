@@ -22,17 +22,21 @@ from __future__ import print_function, division, absolute_import, unicode_litera
 import os
 import signal
 import sys
+import json
 
 from docopt import docopt
 from blessings import Terminal
 
-from fs.opener import fsopendir
+from fs.opener import opener, fsopendir
 from fs.wrapfs.debugfs import DebugFS
 from fs.osfs import OSFS
 from fs.utils import copyfile, copydir
 from fs.wrapfs import WrapFS
 from fs.watch import ensure_watchable
+from fs.appdirfs import UserDataFS
 import fs.watch
+
+from dropboxfs import DropboxOpener
 
 from cuckoodrive.multifs import WritableMultiFS
 from cuckoodrive.partedfs import PartedFS
@@ -40,6 +44,7 @@ from cuckoodrive.utils import mb
 from cuckoodrive.filelock import FileLock
 
 term = Terminal()
+settings_fs = UserDataFS("cuckoodrive", appauthor="Lukas Martinelli")
 
 
 class CuckooDriveFS(WrapFS):
@@ -153,7 +158,7 @@ class SyncedCuckooDrive(object):
         for path in self.userfs.walkdirs():
             if not self.remotefs.exists(path):
                 copydir((self.userfs, path), (self.remotefs, path))
-                print(term.green + ">>> " + "copied " + path + term.normal)
+                print(term.green + " " * 4 + "copied " + path + term.normal)
 
     def has_conflict(self, src, dst):
         src_info = self.userfs.getinfo(src)
@@ -167,7 +172,7 @@ class SyncedCuckooDrive(object):
 
         if user_info["size"] != remote_info["size"]:
             copyfile(self.userfs, path, self.remotefs, path, overwrite=True)
-            print(term.yellow + ">>> " + "updated " + path + term.normal)
+            print(term.yellow + " " * 4 + "updated " + path + term.normal)
 
     def sync_files(self):
         """Copy files that don't exist on remote fs or patch them if they do exist"""
@@ -179,8 +184,32 @@ class SyncedCuckooDrive(object):
                 self.patchfile(path)
             else:
                 copyfile(self.userfs, path, self.remotefs, path, overwrite=False)
-                print(term.green + ">>> " + "copied " + path + term.normal)
+                print(term.green + " " * 4 + "copied " + path + term.normal)
 
+
+class CuckooDropboxOpener(DropboxOpener):
+    @staticmethod
+    def get_options(username):
+        options = {
+            "app_key":"bhhdl31c1xlca9g",
+            "app_secret":"kt8q37wti4i8by7",
+            "app_type":"app_folder"
+        }
+        file_name = "{0}_dropbox.json".format(username)
+
+        if not settings_fs.exists(file_name):
+            with settings_fs.open(file_name, mode="wb") as fh:
+                json.dump(options, fh, indent=4, sort_keys=True)
+        else:
+            with settings_fs.open(file_name, mode="rb") as fh:
+                options = json.load(fh)
+
+        return options
+
+    @staticmethod
+    def update_options(username, options):
+        with settings_fs.open("{0}_dropbox.json".format(username), mode="wb") as fh:
+            json.dump(options, fh, indent=4, sort_keys=True)
 
 def main():
     arguments = docopt(__doc__, version="CuckooDrive 0.0.1")
@@ -188,6 +217,9 @@ def main():
     watch = arguments["--watch"]
     verbose = arguments["--verbose"]
     remote_uris = arguments["<fs_uri>"]
+
+    def register_openers():
+        opener.add(CuckooDropboxOpener)
 
     def sync_aborted(signal, frame):
         print('Stopped synchronizing!')
@@ -197,12 +229,13 @@ def main():
         while True:
             continue
 
+    register_openers()
     remotefs = CuckooDriveFS.from_uris(remote_uris, verbose=verbose)
     userfs = OSFS(path)
 
     if arguments["sync"]:
         signal.signal(signal.SIGINT, sync_aborted)
-        print("Synchronizing {0}".format(path))
+        print(">>> CuckooDrive is synchronizing {0}".format(path))
         SyncedCuckooDrive(userfs, remotefs, watch=watch, verbose=verbose)
         if watch:
             print(">>> CuckooDrive is watching for changes. Press Ctrl-C to Stop.")
