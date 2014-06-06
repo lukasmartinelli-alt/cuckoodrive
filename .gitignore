@@ -34,6 +34,7 @@ nosetests.xml
 # Mr Developer
 .mr.developer.cfg
 .project
+*.swp
 .vagrant
 .pydevproject
 *.sublime-project
