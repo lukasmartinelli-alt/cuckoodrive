@@ -2,11 +2,16 @@ Cuckoo Drive
 ------------
 .. image:: https://travis-ci.org/lukasmartinelli/cuckoodrive.svg?branch=master
   :target: https://travis-ci.org/lukasmartinelli/cuckoodrive
-.. image:: https://coveralls.io/repos/lukasmartinelli/cuckoodrive/badge.png?branch=master
+.. image:: https://img.shields.io/coveralls/lukasmartinelli/cuckoodrive.svg
   :target: https://coveralls.io/r/lukasmartinelli/cuckoodrive?branch=master
 .. image:: https://landscape.io/github/lukasmartinelli/cuckoodrive/master/landscape.png
   :target: https://landscape.io/github/lukasmartinelli/cuckoodrive/master
+  
 Aggregates all the free space provided on various cloud storage providers into one big drive.
+
+**This project has been discontinued because I don't want to write another distributed filesystem.**
+
+http://lukasmartinelli.ch/idea/2014/07/03/future-of-cuckoodrive.html
 
 Install
 ------------------
