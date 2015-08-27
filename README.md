@@ -3,22 +3,16 @@
 Aggregates all the free space provided on various cloud storage
 providers into one big drive.
 
-## Support
+## [Project discontinued](http://lukasmartinelli.ch/idea/2014/07/03/future-of-cuckoodrive.html)
 
-**This project has been discontinued because [I don’t want to write
+**This project has been discontinued because I don’t want to write
 another distributed filesystem.**
 
-http://lukasmartinelli.ch/idea/2014/07/03/future-of-cuckoodrive.html)
-
-## Concept
-
-http://lukasmartinelli.ch/idea/2014/03/11/using-the-cloud-storages-as-one-big-encrypted-disk.html
+## [Concept](http://lukasmartinelli.ch/idea/2014/03/11/using-the-cloud-storages-as-one-big-encrypted-disk.html)
 
 ![Idea Overview](http://lukasmartinelli.ch/media/cuckoodrive_concept.png)
 
-## Concept
-
-http://lukasmartinelli.ch/python/2014/03/13/cuckoo-drive-architecture.html
+## [Architecture](http://lukasmartinelli.ch/python/2014/03/13/cuckoo-drive-architecture.html)
 
 ![Implementation Overview](http://lukasmartinelli.ch/media/cuckoo_drive_implementation.png)
 
