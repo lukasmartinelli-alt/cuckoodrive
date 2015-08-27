@@ -17,8 +17,9 @@ install_requires = [
     'blessings'
 ]
 
+# The dependency is acutally already dead
 dependency_links= [
-    'https://github.com/lukasmartinelli/fs-dropbox/tarball/master#egg=pyfs-dropbox-0.3.3',
+    'https://github.com/lukasmartinelli/graveyard/tarball/fs-dropbox#egg=pyfs-dropbox-0.3.3',
 ]
 
 
@@ -43,7 +44,7 @@ setup(
     url="https://github.com/lukasmartinelli/cuckoodrive",
     description=("Aggregates all the free space provided on various \
                  cloud storage providers into one big drive."),
-    long_description=open('README.rst').read(),
+    long_description=open('README.md').read(),
     packages=['cuckoodrive'],
     install_requires=install_requires,
     extras_require={
